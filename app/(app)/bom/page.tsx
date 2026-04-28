@@ -130,7 +130,7 @@ export default function BomPage() {
                 </div>
                 <div className="form-group" style={{ width: '120px', marginBottom: 0 }}>
                   <label className="form-label">구성수량</label>
-                  <input className="form-control" type="number" min="0.001" step="0.001" value={addQty} onChange={e => setAddQty(Number(e.target.value))} />
+                  <input className="form-control" type="number" min="0" step="any" value={addQty} onChange={e => setAddQty(Number(e.target.value))} />
                 </div>
                 <button className="btn btn-primary" onClick={handleAdd} disabled={saving || !addMaterialId}>
                   추가
@@ -170,8 +170,8 @@ export default function BomPage() {
                             <td className="text-right">
                               <input
                                 type="number"
-                                min="0.001"
-                                step="0.001"
+                                min="0"
+                                step="any"
                                 defaultValue={b.quantity}
                                 onBlur={e => {
                                   const val = Number(e.target.value)

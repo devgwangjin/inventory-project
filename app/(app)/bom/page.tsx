@@ -59,14 +59,15 @@ export default function BomPage() {
     
     setSaving(true)
     try {
-      const { error } = await supabase.from('bom').insert({
+      const { data, error } = await supabase.from('bom').insert({
         product_id: Number(selectedProduct),
         material_id: m.id,
         quantity: 1, // Default to 1
-      })
+      }).select('*, material:material_id(*)').single()
       if (error) throw error
+      
+      setBomItems(prev => [...prev, data as any])
       setToast({ msg: `${m.name} 자재가 추가되었습니다.`, type: 'success' })
-      loadBom(Number(selectedProduct))
     } catch (e: any) {
       setToast({ msg: e.message, type: 'error' })
     } finally { 
@@ -80,15 +81,15 @@ export default function BomPage() {
   )
 
   const handleUpdateQty = async (bomId: number, qty: number) => {
+    setBomItems(prev => prev.map(b => b.id === bomId ? { ...b, quantity: qty } : b))
     await supabase.from('bom').update({ quantity: qty }).eq('id', bomId)
-    loadBom(Number(selectedProduct), false)
   }
 
   const handleDelete = async (bomId: number) => {
     if (!confirm('이 자재를 BOM에서 제거하시겠습니까?')) return
+    setBomItems(prev => prev.filter(b => b.id !== bomId))
     await supabase.from('bom').delete().eq('id', bomId)
     setToast({ msg: '제거되었습니다.', type: 'success' })
-    loadBom(Number(selectedProduct))
   }
 
   const selectedProductObj = products.find(p => p.id === Number(selectedProduct))

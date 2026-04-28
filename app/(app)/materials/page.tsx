@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase, Material } from '@/lib/supabase'
 import Toast from '@/components/Toast'
+import Papa from 'papaparse'
 
 const UNITS = ['EA', 'BOX', '캔', 'kg', '포', '봉', 'SET']
 const empty: Omit<Material, 'id' | 'created_at'> = {
@@ -20,6 +21,9 @@ export default function MaterialsPage() {
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [page, setPage] = useState(1)
   const [stockMap, setStockMap] = useState<Record<number, number>>({})
+  const [bulkModal, setBulkModal] = useState(false)
+  const [bulkFile, setBulkFile] = useState<File | null>(null)
+  const [bulkUploading, setBulkUploading] = useState(false)
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -81,6 +85,63 @@ export default function MaterialsPage() {
     load()
   }
 
+  const downloadTemplate = () => {
+    const csvContent = "\uFEFF, ,▼ 필수입력사항, ,▼ 숫자만 입력,▼ 숫자만 입력, \n검증,자재코드,자재명,단위,기초재고,안전재고,비고\n,M001,테스트자재,EA,100,10,참고사항"
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = '자재대량등록_양식.csv'
+    link.click()
+  }
+
+  const handleBulkUpload = () => {
+    if (!bulkFile) return
+    setBulkUploading(true)
+    Papa.parse(bulkFile, {
+      header: false,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const rows = results.data as string[][]
+          let dataStartIndex = 0
+          if (rows[0] && rows[0].join('').includes('필수입력사항')) {
+             dataStartIndex = 2 // Skip 2 header rows
+          } else if (rows[0] && rows[0].includes('자재코드')) {
+             dataStartIndex = 1 // Skip 1 header row
+          }
+
+          const inserts = rows.slice(dataStartIndex).map(row => ({
+            code: row[1]?.trim(),
+            name: row[2]?.trim(),
+            unit: row[3]?.trim() || 'EA',
+            initial_stock: Number(row[4]?.replace(/,/g, '')) || 0,
+            safety_stock: Number(row[5]?.replace(/,/g, '')) || 0,
+            note: row[6]?.trim() || '',
+            is_active: true
+          })).filter(r => r.code && r.name)
+
+          if (inserts.length === 0) throw new Error('유효한 데이터가 없습니다. 필수입력사항(자재코드, 자재명)을 확인하세요.')
+
+          const { error } = await supabase.from('materials').insert(inserts)
+          if (error) throw error
+
+          setToast({ msg: `${inserts.length}건이 일괄 등록되었습니다.`, type: 'success' })
+          setBulkModal(false)
+          setBulkFile(null)
+          load()
+        } catch (e: any) {
+          setToast({ msg: e.message || '등록 실패. 코드가 중복되었는지 확인하세요.', type: 'error' })
+        } finally {
+          setBulkUploading(false)
+        }
+      },
+      error: () => {
+        setToast({ msg: 'CSV 파일 읽기 오류', type: 'error' })
+        setBulkUploading(false)
+      }
+    })
+  }
+
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
   const totalPages = Math.ceil(filtered.length / PER_PAGE)
 
@@ -97,6 +158,7 @@ export default function MaterialsPage() {
       <div className="page-header">
         <h2>자재 관리</h2>
         <div className="page-header-right">
+          <button className="btn btn-secondary" onClick={() => { setBulkFile(null); setBulkModal(true); }}>📥 일괄 등록</button>
           <button className="btn btn-primary" onClick={openAdd}>＋ 자재 등록</button>
         </div>
       </div>
@@ -220,6 +282,44 @@ export default function MaterialsPage() {
               <button className="btn btn-secondary" onClick={() => setModal(false)}>취소</button>
               <button className="btn btn-primary" onClick={handleSave} disabled={saving || !form.code || !form.name}>
                 {saving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bulkModal && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setBulkModal(false)}>
+          <div className="modal">
+            <div className="modal-header">
+              <span className="modal-title">자재 대량 등록 (CSV)</span>
+              <button className="modal-close" onClick={() => setBulkModal(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '16px', fontSize: '13px' }}>
+                아래에서 양식을 다운로드하여 데이터를 입력한 후 CSV 형식으로 업로드해주세요.<br/>
+                <span style={{ color: 'var(--red)' }}>* 자재코드와 자재명은 필수이며, 코드가 중복되면 실패합니다.</span>
+              </p>
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '24px' }}>
+                <button className="btn btn-secondary" onClick={downloadTemplate}>
+                  ⬇️ CSV 양식 다운로드
+                </button>
+              </div>
+              <div className="form-group">
+                <label className="form-label">CSV 파일 선택</label>
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  className="form-control" 
+                  onChange={e => setBulkFile(e.target.files?.[0] || null)} 
+                  style={{ padding: '8px' }}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setBulkModal(false)}>취소</button>
+              <button className="btn btn-primary" onClick={handleBulkUpload} disabled={!bulkFile || bulkUploading}>
+                {bulkUploading ? '업로드 중...' : '데이터 일괄 등록'}
               </button>
             </div>
           </div>

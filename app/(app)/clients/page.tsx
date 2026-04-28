@@ -68,7 +68,8 @@ export default function ClientsPage() {
       setToast({ msg: e.message || '저장 실패', type: 'error' })
     } finally { setSaving(false) }
   }
-
+  const handleDelete = async (id: number) => {
+    if (!confirm('이 거래처를 삭제하시겠습니까?')) return
     await supabase.from('clients').delete().eq('id', id)
     setToast({ msg: '삭제되었습니다.', type: 'success' })
     load()

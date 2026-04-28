@@ -35,15 +35,15 @@ export default function BomPage() {
     setMaterials(mats || [])
   }, [])
 
-  const loadBom = useCallback(async (productId: number) => {
-    setLoading(true)
+  const loadBom = useCallback(async (productId: number, showSpinner = true) => {
+    if (showSpinner) setLoading(true)
     const { data } = await supabase
       .from('bom')
       .select('*, material:material_id(*)')
       .eq('product_id', productId)
       .order('id')
     setBomItems((data || []) as any)
-    setLoading(false)
+    if (showSpinner) setLoading(false)
   }, [])
 
   useEffect(() => { loadBase() }, [loadBase])
@@ -81,7 +81,7 @@ export default function BomPage() {
 
   const handleUpdateQty = async (bomId: number, qty: number) => {
     await supabase.from('bom').update({ quantity: qty }).eq('id', bomId)
-    loadBom(Number(selectedProduct))
+    loadBom(Number(selectedProduct), false)
   }
 
   const handleDelete = async (bomId: number) => {

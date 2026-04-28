@@ -29,9 +29,11 @@ const navItems = [
   {
     section: '현황 / 보고서',
     items: [
-      { href: '/inventory', icon: '📋', label: '재고 현황' },
-      { href: '/reports/monthly', icon: '📅', label: '월간 현황' },
-      { href: '/reports/yearly', icon: '📆', label: '년간 현황' },
+      { href: '/inventory', icon: '📋', label: '자재 재고 현황' },
+      { href: '/reports/monthly', icon: '📅', label: '월간 자재 입출고' },
+      { href: '/reports/yearly', icon: '📆', label: '년간 자재 입출고' },
+      { href: '/reports/products-monthly', icon: '📊', label: '월간 품목 출고' },
+      { href: '/reports/products-yearly', icon: '📈', label: '년간 품목 출고' },
     ],
   },
 ]

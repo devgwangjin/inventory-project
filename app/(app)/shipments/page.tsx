@@ -51,12 +51,12 @@ export default function ShipmentsPage() {
     if (!form.product_id || form.quantity <= 0) return
     setSaving(true)
     try {
-      // 1. Insert shipment
-      const { error } = await supabase.from('product_shipments').insert({
+      // 1. Insert shipment and get ID
+      const { data: newShipment, error } = await supabase.from('product_shipments').insert({
         ...form,
         client_id: null, // Ignored in UI now, but keeping for backward schema compatibility
         delivery_company: form.delivery_company || null,
-      })
+      }).select('id').single()
       if (error) throw error
 
       // 2. Auto-deduct materials via BOM
@@ -69,6 +69,7 @@ export default function ShipmentsPage() {
           date: form.date,
           client_id: null,
           material_id: b.material_id,
+          product_shipment_id: newShipment.id,
           quantity: b.quantity * form.quantity,
           type: 'out',
           note: `품목출고 자동차감 (${form.delivery_company || form.note || ''})`,
@@ -86,9 +87,9 @@ export default function ShipmentsPage() {
   }
 
   const handleDelete = async (id: number) => {
-    if (!confirm('이 출고 내역을 삭제하시겠습니까?\n(자동 차감된 자재 내역은 별도 삭제 필요)')) return
+    if (!confirm('이 출고 내역을 삭제하시겠습니까?\n(자동 차감되었던 자재 내역들도 함께 자동 삭제 및 복구됩니다.)')) return
     await supabase.from('product_shipments').delete().eq('id', id)
-    setToast({ msg: '삭제되었습니다.', type: 'success' })
+    setToast({ msg: '출고 내역 및 연동된 자재 기록이 삭제되었습니다.', type: 'success' })
     load()
   }
 

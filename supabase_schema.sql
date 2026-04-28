@@ -56,6 +56,7 @@ CREATE TABLE material_transactions (
   date DATE NOT NULL,
   client_id BIGINT REFERENCES clients(id) ON DELETE SET NULL,
   material_id BIGINT REFERENCES materials(id) ON DELETE CASCADE,
+  product_shipment_id BIGINT REFERENCES product_shipments(id) ON DELETE CASCADE,
   quantity NUMERIC NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('in', 'out')),
   note TEXT,
@@ -86,3 +87,6 @@ CREATE TABLE projects (
 
 -- 8. 품목 출고 시 수기 입력용 납품업체 필드 추가
 ALTER TABLE product_shipments ADD COLUMN delivery_company TEXT;
+
+-- 9. 품목 출고 시 자동차감된 자재 내역 연동 (자동 삭제용)
+ALTER TABLE material_transactions ADD COLUMN product_shipment_id BIGINT REFERENCES product_shipments(id) ON DELETE CASCADE;

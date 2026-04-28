@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase, Product, Material, BomItem } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 
@@ -10,9 +10,21 @@ export default function BomPage() {
   const [bomItems, setBomItems] = useState<(BomItem & { material: Material })[]>([])
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
-  const [addMaterialId, setAddMaterialId] = useState<number | ''>('')
-  const [addQty, setAddQty] = useState<number>(1)
   const [saving, setSaving] = useState(false)
+  
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const loadBase = useCallback(async () => {
     const [{ data: prods }, { data: mats }] = await Promise.all([
@@ -41,29 +53,31 @@ export default function BomPage() {
     else setBomItems([])
   }, [selectedProduct, loadBom])
 
-  const handleAdd = async () => {
-    if (!selectedProduct || !addMaterialId || addQty <= 0) return
+  const handleSelectMaterial = async (m: Material) => {
+    if (!selectedProduct) return
+    if (bomItems.some(b => b.material_id === m.id)) return // Already added
+    
     setSaving(true)
     try {
-      // Check duplicate
-      if (bomItems.some(b => b.material_id === addMaterialId)) {
-        setToast({ msg: '이미 추가된 자재입니다.', type: 'error' })
-        return
-      }
       const { error } = await supabase.from('bom').insert({
         product_id: Number(selectedProduct),
-        material_id: Number(addMaterialId),
-        quantity: addQty,
+        material_id: m.id,
+        quantity: 1, // Default to 1
       })
       if (error) throw error
-      setToast({ msg: '자재가 추가되었습니다.', type: 'success' })
-      setAddMaterialId('')
-      setAddQty(1)
+      setToast({ msg: `${m.name} 자재가 추가되었습니다.`, type: 'success' })
       loadBom(Number(selectedProduct))
     } catch (e: any) {
       setToast({ msg: e.message, type: 'error' })
-    } finally { setSaving(false) }
+    } finally { 
+      setSaving(false) 
+    }
   }
+
+  const filteredMaterials = materials.filter(m => 
+    m.name.toLowerCase().includes(searchKeyword.toLowerCase()) || 
+    m.code.toLowerCase().includes(searchKeyword.toLowerCase())
+  )
 
   const handleUpdateQty = async (bomId: number, qty: number) => {
     await supabase.from('bom').update({ quantity: qty }).eq('id', bomId)
@@ -115,26 +129,58 @@ export default function BomPage() {
             <div className="card" style={{ marginBottom: '16px' }}>
               <div className="card-header">
                 <span className="card-title">
-                  {selectedProductObj?.name} — 구성 자재 추가
+                  {selectedProductObj?.name} — 구성 자재 일괄 추가
                 </span>
               </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                <div className="form-group" style={{ flex: '1', minWidth: '240px', marginBottom: 0 }}>
-                  <label className="form-label">자재 선택</label>
-                  <select className="form-control" value={addMaterialId} onChange={e => setAddMaterialId(e.target.value ? Number(e.target.value) : '')}>
-                    <option value="">-- 자재 선택 --</option>
-                    {materials.map(m => (
-                      <option key={m.id} value={m.id}>{m.code} | {m.name} ({m.unit})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-group" style={{ width: '120px', marginBottom: 0 }}>
-                  <label className="form-label">구성수량</label>
-                  <input className="form-control" type="number" min="0" step="any" value={addQty} onChange={e => setAddQty(Number(e.target.value))} />
-                </div>
-                <button className="btn btn-primary" onClick={handleAdd} disabled={saving || !addMaterialId}>
-                  추가
-                </button>
+              <div className="form-group" style={{ marginBottom: 0, position: 'relative' }} ref={dropdownRef}>
+                <label className="form-label">자재 검색 및 다중 선택</label>
+                <input 
+                  type="text" 
+                  className="form-control" 
+                  placeholder="🔍 자재명 또는 코드를 입력하세요... (클릭 시 전체 목록 열림)"
+                  value={searchKeyword}
+                  onChange={e => {
+                    setSearchKeyword(e.target.value);
+                    setDropdownOpen(true);
+                  }}
+                  onFocus={() => setDropdownOpen(true)}
+                  disabled={saving}
+                />
+                
+                {dropdownOpen && (
+                  <ul style={{
+                    position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+                    background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px',
+                    marginTop: '4px', maxHeight: '300px', overflowY: 'auto', padding: 0, listStyle: 'none',
+                    boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                  }}>
+                    {filteredMaterials.length === 0 ? (
+                      <li style={{ padding: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>검색 결과가 없습니다.</li>
+                    ) : (
+                      filteredMaterials.map(m => {
+                        const isAdded = bomItems.some(b => b.material_id === m.id);
+                        return (
+                          <li 
+                            key={m.id}
+                            onClick={() => { if (!isAdded && !saving) handleSelectMaterial(m); }}
+                            style={{
+                              padding: '10px 12px', cursor: isAdded ? 'default' : 'pointer',
+                              borderBottom: '1px solid var(--border)',
+                              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                              background: isAdded ? 'var(--bg-card-hover)' : 'transparent',
+                              color: isAdded ? 'var(--text-muted)' : 'var(--text-primary)'
+                            }}
+                            onMouseEnter={e => { if (!isAdded) e.currentTarget.style.background = 'var(--bg-card-hover)' }}
+                            onMouseLeave={e => { if (!isAdded) e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <span>{m.code} | {m.name} ({m.unit})</span>
+                            {isAdded && <span className="badge badge-active">✓ 추가됨</span>}
+                          </li>
+                        )
+                      })
+                    )}
+                  </ul>
+                )}
               </div>
             </div>
 

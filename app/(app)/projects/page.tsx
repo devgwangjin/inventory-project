@@ -55,12 +55,20 @@ export default function ProjectsPage() {
     if (!form.client_name || !form.product_id) return
     setSaving(true)
     try {
+      const payload = {
+        client_name: form.client_name,
+        product_id: form.product_id,
+        spec: form.spec,
+        status: form.status,
+        note: form.note
+      }
+      
       if (editing) {
-        const { error } = await supabase.from('projects').update(form).eq('id', editing.id)
+        const { error } = await supabase.from('projects').update(payload).eq('id', editing.id)
         if (error) throw error
         setToast({ msg: '프로젝트가 수정되었습니다.', type: 'success' })
       } else {
-        const { error } = await supabase.from('projects').insert(form)
+        const { error } = await supabase.from('projects').insert(payload)
         if (error) throw error
         setToast({ msg: '프로젝트가 등록되었습니다.', type: 'success' })
       }

@@ -19,7 +19,7 @@ export default function MonthlyReportPage() {
         let monthIn = 0
         let monthOut = 0
 
-        txs?.forEach(tx => {
+        txs?.forEach((tx: any) => {
           if (tx.material_id !== m.id) return
           if (tx.date < `${month}-01`) {
             // Previous months

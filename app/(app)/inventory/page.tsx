@@ -19,22 +19,22 @@ export default function InventoryPage() {
       ])
 
       const matStock: Record<number, number> = {}
-      mats?.forEach(m => matStock[m.id] = m.initial_stock || 0)
-      matTx?.forEach(tx => {
+      mats?.forEach((m: any) => matStock[m.id] = m.initial_stock || 0)
+      matTx?.forEach((tx: any) => {
         if (matStock[tx.material_id] === undefined) matStock[tx.material_id] = 0
         if (tx.type === 'in') matStock[tx.material_id] += tx.quantity
         else matStock[tx.material_id] -= tx.quantity
       })
 
       const prodStock: Record<number, number> = {}
-      prods?.forEach(p => prodStock[p.id] = p.initial_stock || 0)
-      prodTx?.forEach(tx => {
+      prods?.forEach((p: any) => prodStock[p.id] = p.initial_stock || 0)
+      prodTx?.forEach((tx: any) => {
         if (prodStock[tx.product_id] === undefined) prodStock[tx.product_id] = 0
         prodStock[tx.product_id] -= tx.quantity // Products only have out shipments in this system
       })
 
-      setMaterials((mats || []).map(m => ({ ...m, current_stock: matStock[m.id] || 0 })))
-      setProducts((prods || []).map(p => ({ ...p, current_stock: prodStock[p.id] || 0 })))
+      setMaterials((mats || []).map((m: any) => ({ ...m, current_stock: matStock[m.id] || 0 })))
+      setProducts((prods || []).map((p: any) => ({ ...p, current_stock: prodStock[p.id] || 0 })))
       setLoading(false)
     }
     load()

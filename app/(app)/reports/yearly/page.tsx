@@ -19,7 +19,7 @@ export default function YearlyReportPage() {
         let yearIn = 0
         let yearOut = 0
 
-        txs?.forEach(tx => {
+        txs?.forEach((tx: any) => {
           if (tx.material_id !== m.id) return
           if (tx.date.startsWith(year)) {
             // Current year

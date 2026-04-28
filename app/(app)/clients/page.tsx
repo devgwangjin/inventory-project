@@ -24,6 +24,7 @@ export default function ClientsPage() {
   const [page, setPage] = useState(1)
   const [bulkModal, setBulkModal] = useState(false)
   const [bulkFile, setBulkFile] = useState<File | null>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [bulkUploading, setBulkUploading] = useState(false)
   const PER_PAGE = 20
 
@@ -73,6 +74,29 @@ export default function ClientsPage() {
     await supabase.from('clients').delete().eq('id', id)
     setToast({ msg: '삭제되었습니다.', type: 'success' })
     load()
+  }
+
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length) return
+    if (!confirm(`선택한 ${selectedIds.length}개의 거래처를 삭제하시겠습니까?`)) return
+    try {
+      const { error } = await supabase.from('clients').delete().in('id', selectedIds)
+      if (error) throw error
+      setToast({ msg: `${selectedIds.length}개가 삭제되었습니다.`, type: 'success' })
+      setSelectedIds([])
+      load()
+    } catch (e: any) {
+      setToast({ msg: e.message || '삭제 실패', type: 'error' })
+    }
+  }
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) setSelectedIds(paginated.map(c => c.id))
+    else setSelectedIds([])
+  }
+
+  const handleSelect = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
   const downloadTemplate = () => {
@@ -158,7 +182,14 @@ export default function ClientsPage() {
             <span className="search-icon">🔍</span>
             <input placeholder="거래처명, 코드, 담당자 검색..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}개</span>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {selectedIds.length > 0 && (
+              <button className="btn btn-danger" onClick={handleBulkDelete}>
+                🗑️ 선택된 {selectedIds.length}건 삭제
+              </button>
+            )}
+            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}개</span>
+          </div>
         </div>
 
         <div className="card" style={{ padding: 0 }}>
@@ -176,6 +207,9 @@ export default function ClientsPage() {
                 <table>
                   <thead>
                     <tr>
+                      <th style={{ width: '40px' }}>
+                        <input type="checkbox" onChange={handleSelectAll} checked={paginated.length > 0 && selectedIds.length === paginated.length} />
+                      </th>
                       <th>코드</th>
                       <th>거래처명</th>
                       <th>사업자번호</th>
@@ -189,6 +223,9 @@ export default function ClientsPage() {
                   <tbody>
                     {paginated.map(c => (
                       <tr key={c.id}>
+                        <td>
+                          <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => handleSelect(c.id)} />
+                        </td>
                         <td><span className="td-code">{c.code}</span></td>
                         <td style={{ fontWeight: 600 }}>{c.name}</td>
                         <td className="td-muted">{c.business_no}</td>

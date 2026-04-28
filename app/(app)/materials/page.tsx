@@ -24,6 +24,7 @@ export default function MaterialsPage() {
   const [bulkModal, setBulkModal] = useState(false)
   const [bulkFile, setBulkFile] = useState<File | null>(null)
   const [bulkUploading, setBulkUploading] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -83,6 +84,29 @@ export default function MaterialsPage() {
     await supabase.from('materials').delete().eq('id', id)
     setToast({ msg: '삭제되었습니다.', type: 'success' })
     load()
+  }
+
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length) return
+    if (!confirm(`선택한 ${selectedIds.length}개의 자재를 삭제하시겠습니까?`)) return
+    try {
+      const { error } = await supabase.from('materials').delete().in('id', selectedIds)
+      if (error) throw error
+      setToast({ msg: `${selectedIds.length}개가 삭제되었습니다.`, type: 'success' })
+      setSelectedIds([])
+      load()
+    } catch (e: any) {
+      setToast({ msg: e.message || '삭제 실패', type: 'error' })
+    }
+  }
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) setSelectedIds(paginated.map(i => i.id))
+    else setSelectedIds([])
+  }
+
+  const handleSelect = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
   }
 
   const downloadTemplate = () => {
@@ -168,7 +192,14 @@ export default function MaterialsPage() {
             <span className="search-icon">🔍</span>
             <input placeholder="자재명, 코드 검색..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}개</span>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {selectedIds.length > 0 && (
+              <button className="btn btn-danger" onClick={handleBulkDelete}>
+                🗑️ 선택된 {selectedIds.length}건 삭제
+              </button>
+            )}
+            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}개</span>
+          </div>
         </div>
         <div className="card" style={{ padding: 0 }}>
           {loading ? <div className="loading-spinner"><div className="spinner" /></div>
@@ -183,6 +214,9 @@ export default function MaterialsPage() {
                   <table>
                     <thead>
                       <tr>
+                        <th style={{ width: '40px' }}>
+                          <input type="checkbox" onChange={handleSelectAll} checked={paginated.length > 0 && selectedIds.length === paginated.length} />
+                        </th>
                         <th>코드</th>
                         <th>자재명</th>
                         <th>단위</th>
@@ -197,6 +231,9 @@ export default function MaterialsPage() {
                     <tbody>
                       {paginated.map(i => (
                         <tr key={i.id}>
+                          <td>
+                            <input type="checkbox" checked={selectedIds.includes(i.id)} onChange={() => handleSelect(i.id)} />
+                          </td>
                           <td><span className="td-code">{i.code}</span></td>
                           <td style={{ fontWeight: 600 }}>{i.name}</td>
                           <td className="td-muted">{i.unit}</td>

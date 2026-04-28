@@ -16,6 +16,7 @@ interface DashStats {
     material_name: string; quantity: number; unit: string
   }>
   monthlyData: Array<{ month: string; in: number; out: number }>
+  productMonthlyData: Array<{ month: string; out: number }>
 }
 
 export default function DashboardPage() {
@@ -26,6 +27,7 @@ export default function DashboardPage() {
     lowStockCount: 0,
     recentTransactions: [],
     monthlyData: [],
+    productMonthlyData: [],
   })
   const [loading, setLoading] = useState(true)
   const today = new Date()
@@ -61,6 +63,24 @@ export default function DashboardPage() {
             const monthIdx = parseInt(tx.date.slice(5, 7)) - 1
             if (tx.type === 'in') months[monthIdx].in += tx.quantity
             else months[monthIdx].out += tx.quantity
+          }
+        }
+
+        // Product Monthly data for current year
+        const productMonths = Array.from({ length: 12 }, (_, i) => {
+          return { month: `${i + 1}월`, out: 0 }
+        })
+
+        const { data: prodMonthlyTx } = await supabase
+          .from('product_shipments')
+          .select('date, quantity')
+          .gte('date', `${year}-01-01`)
+          .lte('date', `${year}-12-31`)
+
+        if (prodMonthlyTx) {
+          for (const tx of prodMonthlyTx) {
+            const monthIdx = parseInt(tx.date.slice(5, 7)) - 1
+            productMonths[monthIdx].out += tx.quantity
           }
         }
 
@@ -100,6 +120,7 @@ export default function DashboardPage() {
           lowStockCount: lowStock,
           recentTransactions: recentTx,
           monthlyData: months,
+          productMonthlyData: productMonths,
         })
       } finally {
         setLoading(false)
@@ -181,22 +202,22 @@ export default function DashboardPage() {
 
           <div className="card">
             <div className="card-header">
-              <span className="card-title">월별 추이</span>
+              <span className="card-title">{year}년 품목 출고 동향</span>
             </div>
             <div className="chart-container" style={{ height: 240 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={stats.monthlyData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                <BarChart data={stats.productMonthlyData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
                   <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
                   <Tooltip
                     contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
                     labelStyle={{ color: 'var(--text-primary)' }}
+                    cursor={{ fill: 'var(--bg-card-hover)' }}
                   />
                   <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Line type="monotone" dataKey="in" name="입고" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="out" name="출고" stroke="#ef4444" strokeWidth={2} dot={false} />
-                </LineChart>
+                  <Bar dataKey="out" name="품목 출고" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                </BarChart>
               </ResponsiveContainer>
             </div>
           </div>

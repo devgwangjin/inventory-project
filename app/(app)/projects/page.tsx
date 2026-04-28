@@ -23,6 +23,7 @@ export default function ProjectsPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [page, setPage] = useState(1)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -85,6 +86,29 @@ export default function ProjectsPage() {
     load()
   }
 
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length) return
+    if (!confirm(`선택한 ${selectedIds.length}개의 프로젝트를 삭제하시겠습니까?`)) return
+    try {
+      const { error } = await supabase.from('projects').delete().in('id', selectedIds)
+      if (error) throw error
+      setToast({ msg: `${selectedIds.length}개가 삭제되었습니다.`, type: 'success' })
+      setSelectedIds([])
+      load()
+    } catch (e: any) {
+      setToast({ msg: e.message || '삭제 실패', type: 'error' })
+    }
+  }
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) setSelectedIds(paginated.map(i => i.id))
+    else setSelectedIds([])
+  }
+
+  const handleSelect = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
   const totalPages = Math.ceil(filtered.length / PER_PAGE)
 
@@ -103,7 +127,14 @@ export default function ProjectsPage() {
             <span className="search-icon">🔍</span>
             <input placeholder="납품처, 품목, 규격 검색..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}건</span>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {selectedIds.length > 0 && (
+              <button className="btn btn-danger" onClick={handleBulkDelete}>
+                🗑️ 선택된 {selectedIds.length}건 삭제
+              </button>
+            )}
+            <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}건</span>
+          </div>
         </div>
         <div className="card" style={{ padding: 0 }}>
           {loading ? <div className="loading-spinner"><div className="spinner" /></div>
@@ -119,6 +150,9 @@ export default function ProjectsPage() {
                   <table>
                     <thead>
                       <tr>
+                        <th style={{ width: '40px' }}>
+                          <input type="checkbox" onChange={handleSelectAll} checked={paginated.length > 0 && selectedIds.length === paginated.length} />
+                        </th>
                         <th>납품처 (고객사)</th>
                         <th>납품 품목</th>
                         <th>규모 / 규격</th>
@@ -131,6 +165,9 @@ export default function ProjectsPage() {
                     <tbody>
                       {paginated.map(i => (
                         <tr key={i.id}>
+                          <td>
+                            <input type="checkbox" checked={selectedIds.includes(i.id)} onChange={() => handleSelect(i.id)} />
+                          </td>
                           <td style={{ fontWeight: 600 }}>{i.client_name}</td>
                           <td className="td-muted">{i.product?.code} | {i.product?.name}</td>
                           <td>{i.spec || '-'}</td>

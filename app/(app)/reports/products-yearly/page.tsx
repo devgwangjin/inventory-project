@@ -1,6 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, Legend
+} from 'recharts'
 
 export default function ProductsYearlyReportPage() {
   const [year, setYear] = useState(new Date().getFullYear().toString())
@@ -53,6 +57,37 @@ export default function ProductsYearlyReportPage() {
         </div>
       </div>
       <div className="page-body">
+        {/* 차트 영역 */}
+        <div className="card no-print" style={{ marginBottom: '24px' }}>
+          <div className="card-header">
+            <span className="card-title">월별 총 출고량 추이</span>
+          </div>
+          <div className="chart-container" style={{ height: 280 }}>
+            {loading ? <div className="loading-spinner"><div className="spinner" /></div> : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={
+                  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(m => ({
+                    month: `${m}월`,
+                    출고량: data.reduce((a, b) => a + b.months[m - 1], 0)
+                  }))
+                } margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                  <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '8px' }}
+                    labelStyle={{ color: 'var(--text-primary)', fontWeight: 'bold', marginBottom: '4px' }}
+                    cursor={{ fill: 'var(--bg-card-hover)' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '13px' }} />
+                  <Bar dataKey="출고량" name="총 출고량" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={60} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+
+        {/* 표 영역 */}
         <div className="card" style={{ padding: 0 }}>
           {loading ? <div className="loading-spinner"><div className="spinner" /></div> : (
             <div className="table-container" style={{ border: 'none', overflowX: 'auto' }}>

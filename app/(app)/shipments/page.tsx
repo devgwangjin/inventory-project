@@ -6,6 +6,7 @@ import Toast from '@/components/Toast'
 const empty = {
   date: new Date().toISOString().slice(0, 10),
   client_id: null as number | null,
+  delivery_company: '',
   product_id: null as number | null,
   quantity: 1,
   note: '',
@@ -53,7 +54,8 @@ export default function ShipmentsPage() {
       // 1. Insert shipment
       const { error } = await supabase.from('product_shipments').insert({
         ...form,
-        client_id: form.client_id || null,
+        client_id: null, // Ignored in UI now, but keeping for backward schema compatibility
+        delivery_company: form.delivery_company || null,
       })
       if (error) throw error
 
@@ -65,11 +67,11 @@ export default function ShipmentsPage() {
       if (bom && bom.length > 0) {
         const txInserts = bom.map(b => ({
           date: form.date,
-          client_id: form.client_id || null,
+          client_id: null,
           material_id: b.material_id,
           quantity: b.quantity * form.quantity,
           type: 'out',
-          note: `품목출고 자동차감 (${form.note || ''})`,
+          note: `품목출고 자동차감 (${form.delivery_company || form.note || ''})`,
         }))
         await supabase.from('material_transactions').insert(txInserts)
       }
@@ -133,7 +135,7 @@ export default function ShipmentsPage() {
                         <th>날짜</th>
                         <th>품목코드</th>
                         <th>품목명</th>
-                        <th>거래처</th>
+                        <th>납품업체</th>
                         <th className="text-right">수량</th>
                         <th>단위</th>
                         <th>비고</th>
@@ -146,7 +148,7 @@ export default function ShipmentsPage() {
                           <td className="td-muted">{i.date}</td>
                           <td><span className="td-code">{i.product?.code}</span></td>
                           <td style={{ fontWeight: 500 }}>{i.product?.name}</td>
-                          <td className="td-muted">{i.client?.name || '-'}</td>
+                          <td className="td-muted">{i.delivery_company || i.client?.name || '-'}</td>
                           <td className="text-right font-mono text-red">-{i.quantity.toLocaleString()}</td>
                           <td className="td-muted">{i.product?.unit}</td>
                           <td className="td-muted">{i.note}</td>
@@ -198,11 +200,8 @@ export default function ShipmentsPage() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">거래처</label>
-                <select className="form-control" value={form.client_id ?? ''} onChange={e => setForm(f => ({ ...f, client_id: e.target.value ? Number(e.target.value) : null }))}>
-                  <option value="">-- 선택 안 함 --</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.code} | {c.name}</option>)}
-                </select>
+                <label className="form-label">납품업체</label>
+                <input className="form-control" value={form.delivery_company} onChange={e => setForm(f => ({ ...f, delivery_company: e.target.value }))} placeholder="예: (주)한국제일전기" />
               </div>
               <div className="form-group">
                 <label className="form-label">비고</label>

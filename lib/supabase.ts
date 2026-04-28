@@ -122,10 +122,22 @@ export type ProductShipment = {
   id: number
   date: string
   client_id: number | null
+  delivery_company?: string
   product_id: number
   quantity: number
   note: string
   created_at: string
   client?: Client
+  product?: Product
+}
+
+export type Project = {
+  id: number
+  client_name: string
+  product_id: number
+  spec: string
+  status: '제작중' | '완료'
+  note: string
+  created_at: string
   product?: Product
 }

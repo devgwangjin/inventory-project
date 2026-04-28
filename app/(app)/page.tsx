@@ -82,7 +82,7 @@ export default function DashboardPage() {
             else stockMap[tx.material_id] -= tx.quantity
           }
         }
-        const lowStock = matRes.data?.filter(m => (stockMap[m.id] || 0) <= (m.safety_stock || 0)).length || 0
+        const lowStock = matRes.data?.filter((m: any) => (stockMap[m.id] || 0) <= (m.safety_stock || 0)).length || 0
 
         const recentTx = (txRes.data || []).map((t: any) => ({
           id: t.id,

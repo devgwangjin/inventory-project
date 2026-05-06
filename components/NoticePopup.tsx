@@ -46,7 +46,7 @@ export default function NoticePopup() {
         </div>
         <div className="modal-body">
           <p style={{ color: 'var(--text-secondary)', lineHeight: '1.6', wordBreak: 'keep-all' }}>
-            데이터베이스를 일주일간 업로드하지 않으면 supabase 정책에 의해 데이터베이스가 일시정지 될 우려가 있으니 확인하시고 <strong style={{ color: 'var(--text-primary)', fontWeight: '600' }}>일주일에 한 번은 꼭 데이터베이스를 업로드나 수정 등의 작업을 진행해주세요.</strong>
+            Supabase 정책에 따라, 일주일간 데이터베이스 업데이트가 없을 경우 서비스가 일시 정지될 수 있습니다. 이를 방지하기 위해 <strong style={{ color: 'var(--text-primary)', fontWeight: '600' }}>주 1회 이상 데이터 업로드나 수정 등의 작업을 진행해 주시기 바랍니다.</strong>
           </p>
         </div>
         <div className="modal-footer" style={{ flexWrap: 'wrap' }}>

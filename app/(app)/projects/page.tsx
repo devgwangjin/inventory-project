@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
+import Pagination from '@/components/Pagination'
 import { supabase, Project, Product } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 
@@ -189,15 +190,7 @@ export default function ProjectsPage() {
                     </tbody>
                   </table>
                 </div>
-                {totalPages > 1 && (
-                  <div className="pagination">
-                    <span>{(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filtered.length)} / {filtered.length}건</span>
-                    <div className="pagination-buttons">
-                      <button className="pagination-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>이전</button>
-                      <button className="pagination-btn" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>다음</button>
-                    </div>
-                  </div>
-                )}
+                <Pagination page={page} totalPages={totalPages} totalItems={filtered.length} perPage={PER_PAGE} setPage={setPage} />
               </>
             )}
         </div>

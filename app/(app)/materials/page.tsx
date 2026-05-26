@@ -26,6 +26,8 @@ export default function MaterialsPage() {
   const [bulkFile, setBulkFile] = useState<File | null>(null)
   const [bulkUploading, setBulkUploading] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [isPrinting, setIsPrinting] = useState(false)
+  const [printData, setPrintData] = useState<Material[]>([])
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -167,6 +169,22 @@ export default function MaterialsPage() {
     })
   }
 
+  const handlePrint = () => {
+    // Determine print target: selected items or all filtered items
+    const target = selectedIds.length > 0
+      ? filtered.filter(i => selectedIds.includes(i.id))
+      : filtered
+    setPrintData(target)
+    setIsPrinting(true)
+    // Wait for React to render the full unpaginated list, then trigger print
+    setTimeout(() => {
+      window.print()
+      // Restore normal mode after print dialog closes
+      setIsPrinting(false)
+      setPrintData([])
+    }, 300)
+  }
+
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
   const totalPages = Math.ceil(filtered.length / PER_PAGE)
 
@@ -177,16 +195,32 @@ export default function MaterialsPage() {
     return 'stock-ok'
   }
 
+  // Data to render in the table: when printing, show all print targets; otherwise show paginated
+  const tableData = isPrinting ? printData : paginated
+
   return (
     <div>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <div className="page-header">
         <h2>자재 관리</h2>
         <div className="page-header-right">
+          <button className="btn btn-secondary" onClick={handlePrint} title={selectedIds.length > 0 ? `선택한 ${selectedIds.length}건 인쇄` : '전체 목록 인쇄'}>
+            🖨️ {selectedIds.length > 0 ? `선택 인쇄 (${selectedIds.length})` : '인쇄'}
+          </button>
           <button className="btn btn-secondary" onClick={() => { setBulkFile(null); setBulkModal(true); }}>📥 일괄 등록</button>
           <button className="btn btn-primary" onClick={openAdd}>＋ 자재 등록</button>
         </div>
       </div>
+
+      {/* Print header - only visible during printing */}
+      <div className="print-header">
+        <h1>📦 자재 관리 목록</h1>
+        <div className="print-meta">
+          출력일시: {new Date().toLocaleString('ko-KR')} | 총 {isPrinting ? printData.length : filtered.length}건
+          {selectedIds.length > 0 && isPrinting && ' (선택 항목만 출력)'}
+        </div>
+      </div>
+
       <div className="page-body">
         <div className="toolbar">
           <div className="search-box">
@@ -230,7 +264,7 @@ export default function MaterialsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginated.map(i => (
+                      {tableData.map(i => (
                         <tr key={i.id}>
                           <td>
                             <input type="checkbox" checked={selectedIds.includes(i.id)} onChange={() => handleSelect(i.id)} />
@@ -256,9 +290,14 @@ export default function MaterialsPage() {
                     </tbody>
                   </table>
                 </div>
-                <Pagination page={page} totalPages={totalPages} totalItems={filtered.length} perPage={PER_PAGE} setPage={setPage} />
+                {!isPrinting && <Pagination page={page} totalPages={totalPages} totalItems={filtered.length} perPage={PER_PAGE} setPage={setPage} />}
               </>
             )}
+        </div>
+
+        {/* Print footer - only visible during printing */}
+        <div className="print-footer">
+          재고관리 시스템 — 자재 관리 목록 | {new Date().toLocaleDateString('ko-KR')}
         </div>
       </div>
 

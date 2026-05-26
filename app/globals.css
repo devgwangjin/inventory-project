@@ -763,27 +763,195 @@ tbody td {
 }
 
 /* ===== PRINT STYLES ===== */
+
+/* Print header (visible only during print) */
+.print-header {
+  display: none;
+}
+
 @media print {
-  .sidebar, .page-header, .toolbar, .btn, .modal-overlay {
+  /* Hide all UI chrome */
+  .sidebar,
+  .page-header,
+  .toolbar,
+  .btn,
+  .modal-overlay,
+  .pagination,
+  .toast-container,
+  .toast,
+  .no-print {
     display: none !important;
   }
+
+  /* Hide checkbox columns */
+  thead th:first-child,
+  tbody td:first-child {
+    display: none !important;
+  }
+
+  /* Hide action columns (last column with edit/delete buttons) */
+  thead th:last-child,
+  tbody td:last-child {
+    display: none !important;
+  }
+
+  /* Reset layout for full-width */
   .main-content {
     margin-left: 0 !important;
   }
-  .page-body {
-    padding: 0 !important;
+
+  .app-layout {
+    display: block !important;
   }
-  body {
+
+  .page-body {
+    padding: 10px 0 !important;
+  }
+
+  /* White background for printing */
+  html, body {
     background: #fff !important;
     color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
+
+  /* Show print header */
+  .print-header {
+    display: block !important;
+    text-align: center;
+    padding: 20px 0 16px;
+    border-bottom: 2px solid #333;
+    margin-bottom: 16px;
+  }
+
+  .print-header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #000;
+    margin-bottom: 4px;
+  }
+
+  .print-header .print-meta {
+    font-size: 11px;
+    color: #666;
+  }
+
+  /* Table print styling */
+  .card {
+    border: none !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+  }
+
+  .table-container {
+    border: none !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+  }
+
   table {
     font-size: 11px;
+    border-collapse: collapse;
+    width: 100%;
   }
-  .card {
+
+  thead {
+    background: #f3f4f6 !important;
+  }
+
+  thead th {
+    padding: 8px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #333 !important;
+    border: 1px solid #ccc;
+    background: #f3f4f6 !important;
+  }
+
+  tbody td {
+    padding: 7px 10px;
+    color: #000 !important;
     border: 1px solid #ddd;
-    background: #fff;
   }
+
+  tbody tr:hover {
+    background: transparent !important;
+  }
+
+  /* Alternate row shading for readability */
+  tbody tr:nth-child(even) {
+    background: #f9fafb !important;
+  }
+
+  /* Stock status in print */
+  .stock-warning {
+    color: #b45309 !important;
+    font-weight: 700;
+  }
+
+  .stock-danger {
+    color: #dc2626 !important;
+    font-weight: 700;
+  }
+
+  .stock-ok {
+    color: #059669 !important;
+  }
+
+  /* Code badge in print */
+  .td-code {
+    background: #e5e7eb !important;
+    color: #1e40af !important;
+    border: 1px solid #ccc;
+  }
+
+  /* Badge in print */
+  .badge-active {
+    background: #d1fae5 !important;
+    color: #065f46 !important;
+    border: 1px solid #a7f3d0;
+  }
+
+  .badge-inactive {
+    background: #f3f4f6 !important;
+    color: #6b7280 !important;
+    border: 1px solid #d1d5db;
+  }
+
+  /* Print footer */
+  .print-footer {
+    display: block !important;
+    text-align: center;
+    font-size: 10px;
+    color: #999;
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #ddd;
+  }
+
+  /* Page setup */
+  @page {
+    size: A4 landscape;
+    margin: 15mm;
+  }
+
+  /* Repeat table header on each printed page */
+  thead {
+    display: table-header-group;
+  }
+
+  /* Prevent row splitting across pages */
+  tbody tr {
+    page-break-inside: avoid;
+  }
+}
+
+/* Print footer (hidden on screen) */
+.print-footer {
+  display: none;
 }
 
 /* ===== ANIMATIONS ===== */

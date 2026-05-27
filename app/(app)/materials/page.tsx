@@ -205,17 +205,79 @@ export default function MaterialsPage() {
 
   const handleDelete = async (id: number) => {
     if (!confirm('이 자재를 삭제하시겠습니까?')) return
-    await supabase.from('materials').delete().eq('id', id)
-    setToast({ msg: '삭제되었습니다.', type: 'success' })
-    load()
+    const targetItem = items.find(x => x.id === id)
+    if (!targetItem) return
+
+    try {
+      // 1. 자재 삭제
+      const { error } = await supabase.from('materials').delete().eq('id', id)
+      if (error) throw error
+
+      // 2. 파싱 가능하면 뒷번호 코드들 앞으로 당겨 정렬
+      const parsed = parseCode(targetItem.code)
+      if (parsed) {
+        const { data: allMats } = await supabase.from('materials').select('id, code')
+        const targets = (allMats || [])
+          .map((m: any) => ({ ...m, parsed: parseCode(m.code) }))
+          .filter((m: any) => m.parsed && m.parsed.prefix === parsed.prefix && m.parsed.number > parsed.number)
+          .sort((a: any, b: any) => a.parsed.number - b.parsed.number)
+
+        for (const m of targets) {
+          const newCode = parsed.prefix + (m.parsed.number - 1).toString().padStart(parsed.padLength, '0')
+          const { error: updateErr } = await supabase.from('materials').update({ code: newCode }).eq('id', m.id)
+          if (updateErr) throw updateErr
+        }
+      }
+
+      setToast({ msg: '삭제되었습니다.', type: 'success' })
+      load()
+    } catch (e: any) {
+      setToast({ msg: e.message || '삭제 실패', type: 'error' })
+    }
   }
 
   const handleBulkDelete = async () => {
     if (!selectedIds.length) return
     if (!confirm(`선택한 ${selectedIds.length}개의 자재를 삭제하시겠습니까?`)) return
     try {
+      // 1. 삭제 예정 자재 정보에서 접두사(prefix) 추출
+      const deletedItems = items.filter(i => selectedIds.includes(i.id))
+      const affectedPrefixes = new Set<string>()
+      let defaultPadLength = 2
+      for (const item of deletedItems) {
+        const parsed = parseCode(item.code)
+        if (parsed) {
+          affectedPrefixes.add(parsed.prefix)
+          defaultPadLength = parsed.padLength
+        }
+      }
+
+      // 2. 일괄 삭제
       const { error } = await supabase.from('materials').delete().in('id', selectedIds)
       if (error) throw error
+
+      // 3. 영향받은 각 접두사 그룹의 남은 자재들의 번호 재정렬 (1번부터 빈틈없이)
+      if (affectedPrefixes.size > 0) {
+        const { data: remaining } = await supabase.from('materials').select('id, code')
+        
+        for (const prefix of affectedPrefixes) {
+          const targets = (remaining || [])
+            .map((m: any) => ({ ...m, parsed: parseCode(m.code) }))
+            .filter((m: any) => m.parsed && m.parsed.prefix === prefix)
+            .sort((a: any, b: any) => a.parsed.number - b.parsed.number)
+
+          let currentNum = 1
+          for (const m of targets) {
+            const newCode = prefix + currentNum.toString().padStart(m.parsed.padLength || defaultPadLength, '0')
+            if (m.code !== newCode) {
+              const { error: updateErr } = await supabase.from('materials').update({ code: newCode }).eq('id', m.id)
+              if (updateErr) throw updateErr
+            }
+            currentNum++
+          }
+        }
+      }
+
       setToast({ msg: `${selectedIds.length}개가 삭제되었습니다.`, type: 'success' })
       setSelectedIds([])
       load()

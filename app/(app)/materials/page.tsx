@@ -135,8 +135,11 @@ export default function MaterialsPage() {
   useEffect(() => {
     const q = search.toLowerCase()
     setFiltered(items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q)))
-    setPage(1)
   }, [search, items])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search])
 
   const openAdd = () => { setEditing(null); setForm(empty); setShiftCodes(false); setModal(true) }
   const openEdit = (i: Material) => { setEditing(i); setForm({ ...i }); setModal(true) }

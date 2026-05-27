@@ -119,12 +119,17 @@ export default function MaterialsPage() {
           })
         if (error) throw error
       }
+      // 로컬 상태 직접 업데이트하여 loading 스피너 깜빡임 및 페이지 리셋 원천 방지
+      setStockMap(prev => ({ ...prev, [item.id]: newStock }))
+      if (!hasTx) {
+        setItems(prev => prev.map(m => m.id === item.id ? { ...m, initial_stock: newStock } : m))
+      }
+
       setEditingStockId(null)
       setTempStockValue('')
       setFlashingId(item.id)
       setTimeout(() => setFlashingId(null), 900)
       setToast({ msg: `${item.name} 재고가 ${newStock.toLocaleString()}개로 수정되었습니다.`, type: 'success' })
-      await load()
     } catch (e: any) {
       setToast({ msg: e.message || '재고 수정 실패', type: 'error' })
     } finally {

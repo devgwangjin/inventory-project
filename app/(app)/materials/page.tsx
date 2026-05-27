@@ -35,6 +35,10 @@ export default function MaterialsPage() {
   const [isPrinting, setIsPrinting] = useState(false)
   const [printData, setPrintData] = useState<Material[]>([])
   const [shiftCodes, setShiftCodes] = useState(false)
+  const [editingStockId, setEditingStockId] = useState<number | null>(null)
+  const [tempStockValue, setTempStockValue] = useState('')
+  const [flashingId, setFlashingId] = useState<number | null>(null)
+  const [savingStock, setSavingStock] = useState(false)
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -60,6 +64,73 @@ export default function MaterialsPage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const startEditStock = (item: Material) => {
+    if (savingStock) return
+    setEditingStockId(item.id)
+    setTempStockValue(String(stockMap[item.id] ?? 0))
+  }
+
+  const cancelEditStock = () => {
+    setEditingStockId(null)
+    setTempStockValue('')
+  }
+
+  const handleStockUpdate = async (item: Material) => {
+    const newStock = Number(tempStockValue)
+    if (isNaN(newStock) || tempStockValue.trim() === '') {
+      cancelEditStock()
+      return
+    }
+    const currentStock = stockMap[item.id] ?? 0
+    const diff = newStock - currentStock
+    if (diff === 0) {
+      cancelEditStock()
+      return
+    }
+    setSavingStock(true)
+    try {
+      // Check if this material has any transactions
+      const { data: txs } = await supabase
+        .from('material_transactions')
+        .select('id')
+        .eq('material_id', item.id)
+        .limit(1)
+      const hasTx = txs && txs.length > 0
+
+      if (!hasTx) {
+        // No transactions: directly update initial_stock
+        const { error } = await supabase
+          .from('materials')
+          .update({ initial_stock: newStock })
+          .eq('id', item.id)
+        if (error) throw error
+      } else {
+        // Has transactions: create adjustment transaction
+        const today = new Date().toISOString().split('T')[0]
+        const { error } = await supabase
+          .from('material_transactions')
+          .insert({
+            date: today,
+            material_id: item.id,
+            quantity: Math.abs(diff),
+            type: diff > 0 ? 'in' : 'out',
+            note: '재고 실사 조정'
+          })
+        if (error) throw error
+      }
+      setEditingStockId(null)
+      setTempStockValue('')
+      setFlashingId(item.id)
+      setTimeout(() => setFlashingId(null), 900)
+      setToast({ msg: `${item.name} 재고가 ${newStock.toLocaleString()}개로 수정되었습니다.`, type: 'success' })
+      await load()
+    } catch (e: any) {
+      setToast({ msg: e.message || '재고 수정 실패', type: 'error' })
+    } finally {
+      setSavingStock(false)
+    }
+  }
 
   useEffect(() => {
     const q = search.toLowerCase()
@@ -297,7 +368,6 @@ export default function MaterialsPage() {
                         <th>코드</th>
                         <th>자재명</th>
                         <th>단위</th>
-                        <th className="text-right">기초재고</th>
                         <th className="text-right">현재고</th>
                         <th className="text-right">안전재고</th>
                         <th>비고</th>
@@ -314,9 +384,28 @@ export default function MaterialsPage() {
                           <td><span className="td-code">{i.code}</span></td>
                           <td style={{ fontWeight: 600 }}>{i.name}</td>
                           <td className="td-muted">{i.unit}</td>
-                          <td className="text-right font-mono td-muted">{i.initial_stock?.toLocaleString()}</td>
-                          <td className={`text-right font-mono ${getStockClass(i)}`}>
-                            {(stockMap[i.id] ?? 0).toLocaleString()}
+                          <td
+                            className={`text-right font-mono ${getStockClass(i)} ${editingStockId !== i.id && !isPrinting ? 'stock-cell-editable' : ''} ${flashingId === i.id ? 'stock-cell-flash' : ''}`}
+                            onClick={() => !isPrinting && editingStockId !== i.id && startEditStock(i)}
+                          >
+                            {editingStockId === i.id ? (
+                              <input
+                                className="stock-input-inline"
+                                type="number"
+                                value={tempStockValue}
+                                onChange={e => setTempStockValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleStockUpdate(i)
+                                  if (e.key === 'Escape') cancelEditStock()
+                                }}
+                                onBlur={() => handleStockUpdate(i)}
+                                autoFocus
+                                onFocus={e => e.target.select()}
+                                disabled={savingStock}
+                              />
+                            ) : (
+                              (stockMap[i.id] ?? 0).toLocaleString()
+                            )}
                           </td>
                           <td className="text-right font-mono td-muted">{i.safety_stock?.toLocaleString()}</td>
                           <td className="td-muted">{i.note}</td>
@@ -383,7 +472,7 @@ export default function MaterialsPage() {
               </div>
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">기초재고</label>
+                  <label className="form-label">초기 재고</label>
                   <input className="form-control" type="number" value={form.initial_stock} onChange={e => setForm(f => ({ ...f, initial_stock: Number(e.target.value) }))} />
                 </div>
                 <div className="form-group">

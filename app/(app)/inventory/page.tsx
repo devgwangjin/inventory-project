@@ -64,7 +64,6 @@ export default function InventoryPage() {
                       <th>코드</th>
                       <th>자재명</th>
                       <th>단위</th>
-                      <th className="text-right">기초재고</th>
                       <th className="text-right">현재고</th>
                       <th className="text-right">안전재고</th>
                       <th>상태</th>
@@ -74,7 +73,6 @@ export default function InventoryPage() {
                       <th>코드</th>
                       <th>품목명</th>
                       <th>단위</th>
-                      <th className="text-right">기초재고</th>
                       <th className="text-right">현재고</th>
                     </tr>
                   )}
@@ -85,7 +83,6 @@ export default function InventoryPage() {
                       <td><span className="td-code">{m.code}</span></td>
                       <td style={{ fontWeight: 600 }}>{m.name}</td>
                       <td className="td-muted">{m.unit}</td>
-                      <td className="text-right font-mono td-muted">{m.initial_stock.toLocaleString()}</td>
                       <td className={`text-right font-mono ${m.current_stock <= m.safety_stock ? 'stock-danger' : 'stock-ok'}`}>
                         {m.current_stock.toLocaleString()}
                       </td>
@@ -99,7 +96,6 @@ export default function InventoryPage() {
                       <td><span className="td-code">{p.code}</span></td>
                       <td style={{ fontWeight: 600 }}>{p.name}</td>
                       <td className="td-muted">{p.unit}</td>
-                      <td className="text-right font-mono td-muted">{p.initial_stock.toLocaleString()}</td>
                       <td className="text-right font-mono stock-ok">{p.current_stock.toLocaleString()}</td>
                     </tr>
                   ))}

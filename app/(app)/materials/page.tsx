@@ -10,6 +10,12 @@ const empty: Omit<Material, 'id' | 'created_at'> = {
   code: '', name: '', unit: 'EA', initial_stock: 0, safety_stock: 0, note: '', is_active: true
 }
 
+function parseCode(code: string): { prefix: string; number: number; padLength: number } | null {
+  const match = code.match(/^([A-Za-z]+)(\d+)$/)
+  if (!match) return null
+  return { prefix: match[1].toUpperCase(), number: parseInt(match[2], 10), padLength: match[2].length }
+}
+
 export default function MaterialsPage() {
   const [items, setItems] = useState<Material[]>([])
   const [filtered, setFiltered] = useState<Material[]>([])
@@ -28,6 +34,7 @@ export default function MaterialsPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [isPrinting, setIsPrinting] = useState(false)
   const [printData, setPrintData] = useState<Material[]>([])
+  const [shiftCodes, setShiftCodes] = useState(false)
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -60,7 +67,7 @@ export default function MaterialsPage() {
     setPage(1)
   }, [search, items])
 
-  const openAdd = () => { setEditing(null); setForm(empty); setModal(true) }
+  const openAdd = () => { setEditing(null); setForm(empty); setShiftCodes(false); setModal(true) }
   const openEdit = (i: Material) => { setEditing(i); setForm({ ...i }); setModal(true) }
 
   const handleSave = async () => {
@@ -71,6 +78,41 @@ export default function MaterialsPage() {
         const { error } = await supabase.from('materials').update(form).eq('id', editing.id)
         if (error) throw error
         setToast({ msg: '자재가 수정되었습니다.', type: 'success' })
+      } else if (shiftCodes) {
+        // 코드 파싱
+        const parsed = parseCode(form.code)
+        if (!parsed) {
+          setToast({ msg: '코드 형식이 올바르지 않습니다. 영문+숫자 형식이어야 합니다. (예: A19)', type: 'error' })
+          setSaving(false)
+          return
+        }
+        // 같은 접두사의 기존 자재 중 번호 >= 입력번호인 것 조회
+        const { data: allMats } = await supabase.from('materials').select('id, code, name')
+        const conflicting = (allMats || [])
+          .map((m: any) => ({ ...m, parsed: parseCode(m.code) }))
+          .filter((m: any) => m.parsed && m.parsed.prefix === parsed.prefix && m.parsed.number >= parsed.number)
+          .sort((a: any, b: any) => a.parsed.number - b.parsed.number)
+
+        if (conflicting.length > 0) {
+          const affectedList = conflicting
+            .map((m: any) => `  ${m.code} (${m.name}) → ${parsed.prefix}${(m.parsed.number + 1).toString().padStart(parsed.padLength, '0')}`)
+            .join('\n')
+          if (!confirm(`다음 ${conflicting.length}개의 자재 코드가 변경됩니다:\n\n${affectedList}\n\n계속하시겠습니까?`)) {
+            setSaving(false)
+            return
+          }
+          // 높은 번호부터 역순으로 업데이트 (UNIQUE 제약조건 위반 방지)
+          const desc = [...conflicting].sort((a: any, b: any) => b.parsed.number - a.parsed.number)
+          for (const m of desc) {
+            const newCode = parsed.prefix + (m.parsed.number + 1).toString().padStart(parsed.padLength, '0')
+            const { error } = await supabase.from('materials').update({ code: newCode }).eq('id', m.id)
+            if (error) throw error
+          }
+        }
+        // 새 자재 등록
+        const { error } = await supabase.from('materials').insert(form)
+        if (error) throw error
+        setToast({ msg: `자재가 등록되었습니다.${conflicting.length > 0 ? ` ${conflicting.length}개의 코드가 밀렸습니다.` : ''}`, type: 'success' })
       } else {
         const { error } = await supabase.from('materials').insert(form)
         if (error) throw error
@@ -321,6 +363,20 @@ export default function MaterialsPage() {
                   </select>
                 </div>
               </div>
+              {!editing && (
+                <div className="form-group" style={{ marginTop: '-4px', marginBottom: '12px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    <input type="checkbox" checked={shiftCodes} onChange={e => setShiftCodes(e.target.checked)} style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }} />
+                    기존 코드 뒤로 밀기
+                  </label>
+                  {shiftCodes && (
+                    <p style={{ fontSize: '12px', color: 'var(--orange, #f59e0b)', marginTop: '6px', marginBottom: 0, padding: '8px 12px', background: 'rgba(245,158,11,0.08)', borderRadius: '6px', lineHeight: '1.5' }}>
+                      ⚠️ 입력한 코드와 같은 접두사의 기존 코드가 뒤로 밀립니다.<br/>
+                      예: A19 입력 시 → 기존 A19→A20, A20→A21, A21→A22...
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">자재명 <span className="required">*</span></label>
                 <input className="form-control" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />

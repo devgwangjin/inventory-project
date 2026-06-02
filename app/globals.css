@@ -1333,6 +1333,138 @@ tbody td {
   to { transform: rotate(360deg) }
 }
 
+/* ===== ONLINE USERS ===== */
+.online-users-section {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.online-users-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+.online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 4px var(--green); }
+  50% { box-shadow: 0 0 10px var(--green), 0 0 20px rgba(16, 185, 129, 0.3); }
+}
+
+.online-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--green);
+  color: #fff;
+  line-height: 1;
+}
+
+.online-users-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.online-user-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.online-user-item:hover {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.online-user-item.is-me {
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.online-user-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.online-user-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.online-me-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--green);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.online-edit-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  flex-shrink: 0;
+}
+
+.online-user-item:hover .online-edit-btn {
+  opacity: 0.6;
+}
+
+.online-edit-btn:hover {
+  opacity: 1 !important;
+}
+
+.online-user-edit-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--bg-primary);
+  border: 1.5px solid var(--accent);
+  border-radius: 4px;
+  color: var(--text-primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
 /* ===== SCROLLBAR ===== */
 ::-webkit-scrollbar {
   width: 6px;

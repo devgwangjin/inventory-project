@@ -1,6 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { useOnlineUsers } from '@/hooks/useOnlineUsers'
 
 const navItems = [
   {
@@ -41,11 +43,26 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
+  const { users, myIdentity, editingName, setEditingName, updateName } = useOnlineUsers()
+  const [tempName, setTempName] = useState('')
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
     router.refresh()
+  }
+
+  const startEditName = () => {
+    setTempName(myIdentity.name)
+    setEditingName(true)
+  }
+
+  const handleNameSubmit = () => {
+    if (tempName.trim()) {
+      updateName(tempName)
+    } else {
+      setEditingName(false)
+    }
   }
 
   return (
@@ -81,6 +98,46 @@ export default function Sidebar() {
           </div>
         ))}
       </div>
+
+      {/* Online Users Section */}
+      {users.length > 0 && (
+        <div className="online-users-section">
+          <div className="online-users-header">
+            <span className="online-dot" />
+            <span>접속 중</span>
+            <span className="online-count">{users.length}</span>
+          </div>
+          <div className="online-users-list">
+            {users.map(u => (
+              <div key={u.id} className={`online-user-item ${u.isMe ? 'is-me' : ''}`}>
+                <span className="online-user-icon">{u.icon}</span>
+                {u.isMe && editingName ? (
+                  <input
+                    className="online-user-edit-input"
+                    value={tempName}
+                    onChange={e => setTempName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleNameSubmit()
+                      if (e.key === 'Escape') setEditingName(false)
+                    }}
+                    onBlur={handleNameSubmit}
+                    autoFocus
+                    maxLength={12}
+                  />
+                ) : (
+                  <span className="online-user-name">
+                    {u.name}
+                    {u.isMe && <span className="online-me-tag">나</span>}
+                  </span>
+                )}
+                {u.isMe && !editingName && (
+                  <button className="online-edit-btn" onClick={startEditName} title="별명 변경">✏️</button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ padding: '12px' }}>
         <button

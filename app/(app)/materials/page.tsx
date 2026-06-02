@@ -40,6 +40,7 @@ export default function MaterialsPage() {
   const [flashingId, setFlashingId] = useState<number | null>(null)
   const [savingStock, setSavingStock] = useState(false)
   const [onlyShortage, setOnlyShortage] = useState(false)
+  const [onlyZeroStock, setOnlyZeroStock] = useState(false)
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -143,16 +144,20 @@ export default function MaterialsPage() {
     let result = items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q))
     if (onlyShortage) {
       result = result.filter(i => (stockMap[i.id] ?? 0) <= (i.safety_stock || 0))
+    } else if (onlyZeroStock) {
+      result = result.filter(i => (stockMap[i.id] ?? 0) <= 0)
     }
     setFiltered(result)
-  }, [search, items, onlyShortage, stockMap])
+  }, [search, items, onlyShortage, onlyZeroStock, stockMap])
 
   useEffect(() => {
     setPage(1)
-  }, [search, onlyShortage])
+  }, [search, onlyShortage, onlyZeroStock])
 
   // 부족 자재 수 계산 (뱃지에 표시)
   const shortageCount = items.filter(i => (stockMap[i.id] ?? 0) <= (i.safety_stock || 0)).length
+  // 재고 0 이하 자재 수 계산 (뱃지에 표시)
+  const zeroStockCount = items.filter(i => (stockMap[i.id] ?? 0) <= 0).length
 
   const openAdd = () => { setEditing(null); setForm(empty); setShiftCodes(false); setModal(true) }
   const openEdit = (i: Material) => { setEditing(i); setForm({ ...i }); setModal(true) }
@@ -421,10 +426,17 @@ export default function MaterialsPage() {
             </div>
             <button
               className={`btn-filter-shortage ${onlyShortage ? 'active' : ''}`}
-              onClick={() => setOnlyShortage(v => !v)}
+              onClick={() => { setOnlyShortage(v => !v); setOnlyZeroStock(false) }}
               title="현재고가 안전재고 이하인 부족 자재만 필터링합니다"
             >
               ⚠️ 부족 자재{shortageCount > 0 && <span className="filter-count">{shortageCount}</span>}
+            </button>
+            <button
+              className={`btn-filter-zerostock ${onlyZeroStock ? 'active' : ''}`}
+              onClick={() => { setOnlyZeroStock(v => !v); setOnlyShortage(false) }}
+              title="현재고가 0개 이하인 품절 자재만 필터링합니다"
+            >
+              🚫 재고 없음{zeroStockCount > 0 && <span className="filter-count">{zeroStockCount}</span>}
             </button>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>

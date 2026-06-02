@@ -1044,6 +1044,52 @@ tbody td {
   line-height: 1;
 }
 
+/* ===== ZERO STOCK FILTER TOGGLE ===== */
+.btn-filter-zerostock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+}
+
+.btn-filter-zerostock:hover {
+  border-color: #6b7280;
+  color: #4b5563;
+  background: rgba(107, 114, 128, 0.06);
+}
+
+.btn-filter-zerostock.active {
+  border-color: #6b7280;
+  background: rgba(107, 114, 128, 0.10);
+  color: #374151;
+  font-weight: 600;
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.10), 0 1px 3px rgba(107, 114, 128, 0.12);
+}
+
+.btn-filter-zerostock .filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #6b7280;
+  color: #fff;
+  line-height: 1;
+}
+
 /* ===== ANIMATIONS ===== */
 @keyframes fadeIn {
   from { opacity: 0 }

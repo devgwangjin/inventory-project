@@ -39,6 +39,7 @@ export default function MaterialsPage() {
   const [tempStockValue, setTempStockValue] = useState('')
   const [flashingId, setFlashingId] = useState<number | null>(null)
   const [savingStock, setSavingStock] = useState(false)
+  const [onlyShortage, setOnlyShortage] = useState(false)
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -139,12 +140,19 @@ export default function MaterialsPage() {
 
   useEffect(() => {
     const q = search.toLowerCase()
-    setFiltered(items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q)))
-  }, [search, items])
+    let result = items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q))
+    if (onlyShortage) {
+      result = result.filter(i => (stockMap[i.id] ?? 0) <= (i.safety_stock || 0))
+    }
+    setFiltered(result)
+  }, [search, items, onlyShortage, stockMap])
 
   useEffect(() => {
     setPage(1)
-  }, [search])
+  }, [search, onlyShortage])
+
+  // 부족 자재 수 계산 (뱃지에 표시)
+  const shortageCount = items.filter(i => (stockMap[i.id] ?? 0) <= (i.safety_stock || 0)).length
 
   const openAdd = () => { setEditing(null); setForm(empty); setShiftCodes(false); setModal(true) }
   const openEdit = (i: Material) => { setEditing(i); setForm({ ...i }); setModal(true) }
@@ -406,9 +414,18 @@ export default function MaterialsPage() {
 
       <div className="page-body">
         <div className="toolbar">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
-            <input placeholder="자재명, 코드 검색..." value={search} onChange={e => setSearch(e.target.value)} />
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: 1 }}>
+            <div className="search-box">
+              <span className="search-icon">🔍</span>
+              <input placeholder="자재명, 코드 검색..." value={search} onChange={e => setSearch(e.target.value)} />
+            </div>
+            <button
+              className={`btn-filter-shortage ${onlyShortage ? 'active' : ''}`}
+              onClick={() => setOnlyShortage(v => !v)}
+              title="현재고가 안전재고 이하인 부족 자재만 필터링합니다"
+            >
+              ⚠️ 부족 자재{shortageCount > 0 && <span className="filter-count">{shortageCount}</span>}
+            </button>
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             {selectedIds.length > 0 && (

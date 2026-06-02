@@ -1044,6 +1044,229 @@ tbody td {
   line-height: 1;
 }
 
+/* ===== SEARCHABLE SELECT (COMBOBOX) ===== */
+.ss-container {
+  position: relative;
+  width: 100%;
+}
+
+.ss-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 42px;
+  background: var(--bg-primary);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  cursor: text;
+  transition: all 0.2s ease;
+}
+
+.ss-input-wrapper:hover {
+  border-color: var(--border-light);
+}
+
+.ss-input-wrapper.ss-focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.ss-input {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+}
+
+.ss-input::placeholder {
+  color: var(--text-muted);
+}
+
+.ss-selected-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.ss-selected-code {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #fff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ss-selected-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ss-selected-unit {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ss-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--red, #ef4444);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.ss-clear:hover {
+  background: rgba(239, 68, 68, 0.2);
+  transform: scale(1.1);
+}
+
+.ss-chevron {
+  color: var(--text-muted);
+  font-size: 12px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.ss-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.2);
+  z-index: 1000;
+  animation: ssSlideDown 0.15s ease;
+  overflow: hidden;
+}
+
+@keyframes ssSlideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ss-dropdown-search {
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ss-dropdown-search::placeholder {
+  color: var(--text-muted);
+}
+
+.ss-options-header {
+  padding: 8px 14px 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.ss-options-count {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.ss-options-list {
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.ss-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.ss-option-highlight {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.ss-option:active {
+  transform: scale(0.99);
+}
+
+.ss-option-selected {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.ss-option-selected .ss-option-code {
+  background: var(--accent);
+  color: #fff;
+}
+
+.ss-option-code {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ss-option-name {
+  font-size: 13px;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ss-option-unit {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ss-no-result {
+  padding: 20px 14px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 /* ===== ZERO STOCK FILTER TOGGLE ===== */
 .btn-filter-zerostock {
   display: inline-flex;

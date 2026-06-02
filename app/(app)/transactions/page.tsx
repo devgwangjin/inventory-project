@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Pagination from '@/components/Pagination'
 import { supabase, MaterialTransaction, Client, Material } from '@/lib/supabase'
 import Toast from '@/components/Toast'
+import SearchableSelect from '@/components/SearchableSelect'
 
 const empty = {
   date: new Date().toISOString().slice(0, 10),
@@ -182,17 +183,21 @@ export default function TransactionsPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">자재 <span className="required">*</span></label>
-                <select className="form-control" value={form.material_id ?? ''} onChange={e => setForm(f => ({ ...f, material_id: e.target.value ? Number(e.target.value) : null }))}>
-                  <option value="">-- 자재 선택 --</option>
-                  {materials.map(m => <option key={m.id} value={m.id}>{m.code} | {m.name} ({m.unit})</option>)}
-                </select>
+                <SearchableSelect
+                  options={materials.map(m => ({ id: m.id, code: m.code, name: m.name, unit: m.unit }))}
+                  value={form.material_id}
+                  onChange={(id) => setForm(f => ({ ...f, material_id: id }))}
+                  placeholder="자재코드 또는 자재명을 입력하세요..."
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">거래처</label>
-                <select className="form-control" value={form.client_id ?? ''} onChange={e => setForm(f => ({ ...f, client_id: e.target.value ? Number(e.target.value) : null }))}>
-                  <option value="">-- 선택 안 함 --</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.code} | {c.name}</option>)}
-                </select>
+                <SearchableSelect
+                  options={clients.map(c => ({ id: c.id, code: c.code, name: c.name }))}
+                  value={form.client_id}
+                  onChange={(id) => setForm(f => ({ ...f, client_id: id }))}
+                  placeholder="거래처를 검색하세요..."
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">비고</label>

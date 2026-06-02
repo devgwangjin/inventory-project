@@ -94,6 +94,49 @@ export default function ShipmentsPage() {
     load()
   }
 
+  const handleSyncBom = async (shipment: ProductShipment & { product: Product }) => {
+    if (!confirm(`[${shipment.product?.name}] 품목의 최신 BOM 기준으로 자재 차감 내역을 재계산하시겠습니까?\n\n이 작업은 기존 차감 기록을 지우고 현재 BOM 기준으로 자재 재고 차감을 다시 수행합니다.`)) return
+    setSaving(true)
+    try {
+      // 1. Delete existing material transactions linked to this shipment
+      const { error: delError } = await supabase
+        .from('material_transactions')
+        .delete()
+        .eq('product_shipment_id', shipment.id)
+      if (delError) throw delError
+
+      // 2. Fetch current BOM
+      const { data: bom, error: bomError } = await supabase
+        .from('bom')
+        .select('material_id, quantity')
+        .eq('product_id', shipment.product_id)
+      if (bomError) throw bomError
+
+      if (bom && bom.length > 0) {
+        const txInserts = bom.map(b => ({
+          date: shipment.date,
+          client_id: null,
+          material_id: b.material_id,
+          product_shipment_id: shipment.id,
+          quantity: b.quantity * shipment.quantity,
+          type: 'out',
+          note: `품목출고 자동차감 재계산 (${shipment.delivery_company || shipment.note || ''})`,
+        }))
+        const { error: insError } = await supabase
+          .from('material_transactions')
+          .insert(txInserts)
+        if (insError) throw insError
+      }
+
+      setToast({ msg: `최신 BOM 기준으로 자재 차감 내역이 재계산되었습니다. (자재 ${bom?.length || 0}종)`, type: 'success' })
+      load()
+    } catch (e: any) {
+      setToast({ msg: e.message, type: 'error' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
@@ -113,7 +156,7 @@ export default function ShipmentsPage() {
           fontSize: '13px',
           marginBottom: '16px',
         }}>
-          💡 품목 출고 시 BOM에 등록된 구성 자재가 <strong>자동으로 출고 차감</strong>됩니다.
+          💡 품목 출고 시 BOM에 등록된 구성 자재가 <strong>자동으로 출고 차감</strong>됩니다. BOM 수정 시에는 개별 출고 건의 <strong>[🔄 BOM 재계산]</strong>을 클릭하여 동기화할 수 있습니다.
         </div>
 
         <div className="toolbar">
@@ -154,7 +197,8 @@ export default function ShipmentsPage() {
                           <td className="text-right font-mono text-red">-{i.quantity.toLocaleString()}</td>
                           <td className="td-muted">{i.product?.unit}</td>
                           <td className="td-muted">{i.note}</td>
-                          <td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <button className="btn btn-secondary btn-sm" style={{ marginRight: '6px' }} onClick={() => handleSyncBom(i)}>🔄 BOM 재계산</button>
                             <button className="btn btn-danger btn-sm" onClick={() => handleDelete(i.id)}>삭제</button>
                           </td>
                         </tr>

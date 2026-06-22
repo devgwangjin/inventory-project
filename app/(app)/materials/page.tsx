@@ -4,6 +4,7 @@ import Pagination from '@/components/Pagination'
 import { supabase, Material } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import Papa from 'papaparse'
+import { matchesSearch } from '@/lib/search'
 
 const UNITS = ['EA', 'BOX', '캔', 'kg', '포', '봉', 'SET']
 const empty: Omit<Material, 'id' | 'created_at'> = {
@@ -140,8 +141,7 @@ export default function MaterialsPage() {
   }
 
   useEffect(() => {
-    const q = search.toLowerCase()
-    let result = items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q))
+    let result = items.filter(i => matchesSearch(search, [i.name, i.code]))
     if (onlyShortage) {
       result = result.filter(i => (stockMap[i.id] ?? 0) <= (i.safety_stock || 0))
     } else if (onlyZeroStock) {

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { matchesSearch } from '@/lib/search'
 
 export interface SearchableOption {
   id: number
@@ -26,10 +27,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
   const selected = options.find(o => o.id === value) || null
 
   const filtered = query.trim()
-    ? options.filter(o => {
-        const q = query.toLowerCase()
-        return o.code.toLowerCase().includes(q) || o.name.toLowerCase().includes(q)
-      })
+    ? options.filter(o => matchesSearch(query, [o.code, o.name]))
     : options
 
   // Reset highlight when filtered list changes

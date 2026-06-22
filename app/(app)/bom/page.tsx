@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase, Product, Material, BomItem } from '@/lib/supabase'
 import Toast from '@/components/Toast'
+import { matchesSearch } from '@/lib/search'
 
 export default function BomPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -76,8 +77,7 @@ export default function BomPage() {
   }
 
   const filteredMaterials = materials.filter(m => 
-    m.name.toLowerCase().includes(searchKeyword.toLowerCase()) || 
-    m.code.toLowerCase().includes(searchKeyword.toLowerCase())
+    matchesSearch(searchKeyword, [m.name, m.code])
   )
 
   const handleUpdateQty = async (bomId: number, qty: number) => {

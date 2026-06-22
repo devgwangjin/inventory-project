@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Pagination from '@/components/Pagination'
 import { supabase, Project, Product } from '@/lib/supabase'
 import Toast from '@/components/Toast'
+import { matchesSearch } from '@/lib/search'
 
 const empty = {
   client_name: '',
@@ -41,11 +42,8 @@ export default function ProjectsPage() {
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    const q = search.toLowerCase()
     setFiltered(items.filter(i => 
-      i.client_name.toLowerCase().includes(q) || 
-      i.product?.name.toLowerCase().includes(q) ||
-      i.spec?.toLowerCase().includes(q)
+      matchesSearch(search, [i.client_name, i.product?.name, i.spec])
     ))
     setPage(1)
   }, [search, items])

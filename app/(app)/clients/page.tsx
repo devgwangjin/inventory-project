@@ -4,6 +4,7 @@ import Pagination from '@/components/Pagination'
 import { supabase, Client } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import Papa from 'papaparse'
+import { matchesSearch } from '@/lib/search'
 
 const UNITS = ['EA', 'BOX', '캔', 'kg', '포', '봉', 'SET']
 const empty: Omit<Client, 'id' | 'created_at'> = {
@@ -39,12 +40,8 @@ export default function ClientsPage() {
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    const q = search.toLowerCase()
     setFiltered(clients.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.code.toLowerCase().includes(q) ||
-      (c.manager || '').toLowerCase().includes(q) ||
-      (c.business_item || '').toLowerCase().includes(q)
+      matchesSearch(search, [c.name, c.code, c.manager, c.business_item])
     ))
     setPage(1)
   }, [search, clients])

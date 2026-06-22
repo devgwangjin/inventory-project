@@ -4,6 +4,7 @@ import Pagination from '@/components/Pagination'
 import { supabase, Product } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import Papa from 'papaparse'
+import { matchesSearch } from '@/lib/search'
 
 const UNITS = ['EA', 'BOX', '캔', 'kg', '포', '봉', 'SET']
 const empty: Omit<Product, 'id' | 'created_at'> = {
@@ -37,8 +38,7 @@ export default function ProductsPage() {
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    const q = search.toLowerCase()
-    setFiltered(items.filter(i => i.name.toLowerCase().includes(q) || i.code.toLowerCase().includes(q)))
+    setFiltered(items.filter(i => matchesSearch(search, [i.name, i.code])))
     setPage(1)
   }, [search, items])
 

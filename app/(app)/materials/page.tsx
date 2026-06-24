@@ -572,11 +572,11 @@ export default function MaterialsPage() {
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">초기 재고</label>
-                  <input className="form-control" type="number" value={form.initial_stock} onChange={e => setForm(f => ({ ...f, initial_stock: Number(e.target.value) }))} />
+                  <input className="form-control" type="number" value={form.initial_stock === 0 ? '' : form.initial_stock} onChange={e => setForm(f => ({ ...f, initial_stock: e.target.value === '' ? 0 : Number(e.target.value) }))} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">안전재고</label>
-                  <input className="form-control" type="number" value={form.safety_stock} onChange={e => setForm(f => ({ ...f, safety_stock: Number(e.target.value) }))} />
+                  <input className="form-control" type="number" value={form.safety_stock === 0 ? '' : form.safety_stock} onChange={e => setForm(f => ({ ...f, safety_stock: e.target.value === '' ? 0 : Number(e.target.value) }))} />
                 </div>
               </div>
               <div className="form-group">

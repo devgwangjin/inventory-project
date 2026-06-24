@@ -227,7 +227,7 @@ export default function ShipmentsPage() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">수량 <span className="required">*</span></label>
-                  <input className="form-control" type="number" min="1" value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: Number(e.target.value) }))} />
+                  <input className="form-control" type="number" min="1" value={form.quantity === 0 ? '' : form.quantity} onChange={e => setForm(f => ({ ...f, quantity: e.target.value === '' ? 0 : Number(e.target.value) }))} />
                 </div>
               </div>
               <div className="form-group">

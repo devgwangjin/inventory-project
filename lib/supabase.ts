@@ -142,3 +142,13 @@ export type Project = {
   created_at: string
   product?: Product
 }
+
+export type ProjectWithProduct = Project & {
+  product: Product
+}
+
+export type ProductShipmentWithProduct = ProductShipment & {
+  product: Product
+  client?: Client
+}
+

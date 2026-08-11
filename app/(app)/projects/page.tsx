@@ -1,9 +1,11 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import Pagination from '@/components/Pagination'
-import { supabase, Project, Product } from '@/lib/supabase'
+import { supabase, Project, Product, ProjectWithProduct } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import { matchesSearch } from '@/lib/search'
+import { buildCombinedNote, parseCombinedNote } from '@/lib/format'
+import { deductBomMaterials, restoreBomMaterials, recalculateBomMaterials } from '@/lib/bom'
 
 const empty = {
   client_name: '',
@@ -17,48 +19,9 @@ const empty = {
   note: '',
 }
 
-function buildCombinedNote(manager: string, deliveryTime: string, address: string, userNote: string) {
-  const parts: string[] = []
-  if (manager.trim()) parts.push(`[담당: ${manager.trim()}]`)
-  if (deliveryTime.trim()) parts.push(`[납품시간: ${deliveryTime.trim()}]`)
-  if (address.trim()) parts.push(`[주소: ${address.trim()}]`)
-  if (userNote.trim()) parts.push(userNote.trim())
-  return parts.join(' ')
-}
-
-function parseCombinedNote(fullNote: string) {
-  let manager = ''
-  let deliveryTime = ''
-  let address = ''
-  let note = fullNote || ''
-
-  if (!fullNote) return { manager, deliveryTime, address, note }
-
-  const managerMatch = fullNote.match(/\[담당:\s*([^\]]+)\]/)
-  if (managerMatch) {
-    manager = managerMatch[1]
-    note = note.replace(managerMatch[0], '')
-  }
-
-  const deliveryMatch = fullNote.match(/\[납품시간:\s*([^\]]+)\]/)
-  if (deliveryMatch) {
-    deliveryTime = deliveryMatch[1]
-    note = note.replace(deliveryMatch[0], '')
-  }
-
-  const addressMatch = fullNote.match(/\[주소:\s*([^\]]+)\]/)
-  if (addressMatch) {
-    address = addressMatch[1]
-    note = note.replace(addressMatch[0], '')
-  }
-
-  note = note.trim()
-  return { manager, deliveryTime, address, note }
-}
-
 export default function ProjectsPage() {
-  const [items, setItems] = useState<(Project & { product: Product })[]>([])
-  const [filtered, setFiltered] = useState<(Project & { product: Product })[]>([])
+  const [items, setItems] = useState<ProjectWithProduct[]>([])
+  const [filtered, setFiltered] = useState<ProjectWithProduct[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -68,7 +31,7 @@ export default function ProjectsPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [page, setPage] = useState(1)
-  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectedIds, setSelectedIds] = useState<number[] >([])
   const PER_PAGE = 20
 
   const load = useCallback(async () => {
@@ -77,7 +40,7 @@ export default function ProjectsPage() {
       supabase.from('projects').select('*, product:product_id(*)').order('created_at', { ascending: false }),
       supabase.from('products').select('*').eq('is_active', true).order('code')
     ])
-    setItems((data || []) as any)
+    setItems((data || []) as ProjectWithProduct[])
     setProducts(pr || [])
     setLoading(false)
   }, [])
@@ -141,24 +104,14 @@ export default function ProjectsPage() {
         const { error } = await supabase.from('projects').insert(payload)
         if (error) throw error
 
-        // Auto-deduct materials via BOM on '제작중'
+        // Auto-deduct materials via BOM helper on '제작중'
         if (form.status === '제작중') {
-          const { data: bom } = await supabase.from('bom')
-            .select('material_id, quantity')
-            .eq('product_id', form.product_id)
-
-          if (bom && bom.length > 0) {
-            const today = new Date().toISOString().slice(0, 10)
-            const txInserts = bom.map(b => ({
-              date: today,
-              client_id: null,
-              material_id: b.material_id,
-              quantity: b.quantity * form.quantity,
-              type: 'out',
-              note: `제작 투입 자동차감 (${form.client_name} - ${selectedProduct?.name || ''} ${form.quantity}개)`,
-            }))
-            await supabase.from('material_transactions').insert(txInserts)
-          }
+          await deductBomMaterials({
+            productId: form.product_id,
+            quantity: form.quantity,
+            clientName: form.client_name,
+            productName: selectedProduct?.name || ''
+          })
         }
         setToast({ msg: '제작이 등록되었습니다. BOM 자재 자동 차감 적용.', type: 'success' })
       }
@@ -168,37 +121,16 @@ export default function ProjectsPage() {
     } finally { setSaving(false) }
   }
 
-  const handleSyncBom = async (project: Project & { product: Product }) => {
+  const handleSyncBom = async (project: ProjectWithProduct) => {
     if (!confirm(`[${project.product?.name}] 품목의 최신 BOM 기준으로 자재 차감 내역을 재계산하시겠습니까?`)) return
     setSaving(true)
     try {
-      // 1. Delete old material transactions linked to this project/client
-      await supabase
-        .from('material_transactions')
-        .delete()
-        .ilike('note', `%제작 투입%${project.client_name}%`)
-
-      // 2. Fetch current BOM
-      const { data: bom, error: bomError } = await supabase
-        .from('bom')
-        .select('material_id, quantity')
-        .eq('product_id', project.product_id)
-      if (bomError) throw bomError
-
-      if (bom && bom.length > 0) {
-        const today = new Date().toISOString().slice(0, 10)
-        const qty = project.quantity || 1
-        const txInserts = bom.map(b => ({
-          date: today,
-          client_id: null,
-          material_id: b.material_id,
-          quantity: b.quantity * qty,
-          type: 'out',
-          note: `제작 투입 자동차감 (${project.client_name} - ${project.product?.name || ''} ${qty}개)`,
-        }))
-        await supabase.from('material_transactions').insert(txInserts)
-      }
-
+      await recalculateBomMaterials({
+        productId: project.product_id,
+        quantity: project.quantity || 1,
+        clientName: project.client_name,
+        productName: project.product?.name || ''
+      })
       setToast({ msg: `최신 BOM 기준으로 자재 차감이 재계산되었습니다.`, type: 'success' })
       load()
     } catch (e: any) {
@@ -208,7 +140,7 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleShipmentComplete = async (project: Project & { product: Product }) => {
+  const handleShipmentComplete = async (project: ProjectWithProduct) => {
     if (!confirm(`[${project.client_name}] - [${project.product?.name}] 제작 완료건을 현장 출고 처리하시겠습니까?`)) return
     setSaving(true)
     try {
@@ -239,17 +171,14 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleDelete = async (project: Project & { product: Product }) => {
+  const handleDelete = async (project: ProjectWithProduct) => {
     if (!confirm(`[${project.client_name}] - [${project.product?.name}] 제작 내역을 취소/삭제하시겠습니까?\n\n(※ 자동차감되었던 자재들도 원래대로 재고가 자동 복구됩니다.)`)) return
     setSaving(true)
     try {
-      // 1. Restore materials by deleting associated material transactions
-      await supabase
-        .from('material_transactions')
-        .delete()
-        .ilike('note', `%제작 투입%${project.client_name}%`)
+      // Restore materials using BOM helper
+      await restoreBomMaterials(project.client_name)
 
-      // 2. Delete project
+      // Delete project
       const { error } = await supabase.from('projects').delete().eq('id', project.id)
       if (error) throw error
 
@@ -268,10 +197,7 @@ export default function ProjectsPage() {
     try {
       const selectedProjects = items.filter(i => selectedIds.includes(i.id))
       for (const p of selectedProjects) {
-        await supabase
-          .from('material_transactions')
-          .delete()
-          .ilike('note', `%제작 투입%${p.client_name}%`)
+        await restoreBomMaterials(p.client_name)
       }
       const { error } = await supabase.from('projects').delete().in('id', selectedIds)
       if (error) throw error

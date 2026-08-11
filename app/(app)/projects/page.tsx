@@ -9,9 +9,51 @@ const empty = {
   client_name: '',
   product_id: null as number | null,
   quantity: 1,
+  manager: '',
+  delivery_time: '',
+  address: '',
   spec: '',
   status: '제작중' as '제작중' | '완료',
   note: '',
+}
+
+function buildCombinedNote(manager: string, deliveryTime: string, address: string, userNote: string) {
+  const parts: string[] = []
+  if (manager.trim()) parts.push(`[담당: ${manager.trim()}]`)
+  if (deliveryTime.trim()) parts.push(`[납품시간: ${deliveryTime.trim()}]`)
+  if (address.trim()) parts.push(`[주소: ${address.trim()}]`)
+  if (userNote.trim()) parts.push(userNote.trim())
+  return parts.join(' ')
+}
+
+function parseCombinedNote(fullNote: string) {
+  let manager = ''
+  let deliveryTime = ''
+  let address = ''
+  let note = fullNote || ''
+
+  if (!fullNote) return { manager, deliveryTime, address, note }
+
+  const managerMatch = fullNote.match(/\[담당:\s*([^\]]+)\]/)
+  if (managerMatch) {
+    manager = managerMatch[1]
+    note = note.replace(managerMatch[0], '')
+  }
+
+  const deliveryMatch = fullNote.match(/\[납품시간:\s*([^\]]+)\]/)
+  if (deliveryMatch) {
+    deliveryTime = deliveryMatch[1]
+    note = note.replace(deliveryMatch[0], '')
+  }
+
+  const addressMatch = fullNote.match(/\[주소:\s*([^\]]+)\]/)
+  if (addressMatch) {
+    address = addressMatch[1]
+    note = note.replace(addressMatch[0], '')
+  }
+
+  note = note.trim()
+  return { manager, deliveryTime, address, note }
 }
 
 export default function ProjectsPage() {
@@ -43,23 +85,36 @@ export default function ProjectsPage() {
   useEffect(() => { load() }, [load])
 
   useEffect(() => {
-    setFiltered(items.filter(i => 
-      matchesSearch(search, [i.client_name, i.product?.name, i.spec])
-    ))
+    setFiltered(items.filter(i => {
+      const parsed = parseCombinedNote(i.note || '')
+      return matchesSearch(search, [
+        i.client_name, 
+        i.product?.name, 
+        i.spec, 
+        parsed.manager, 
+        parsed.address, 
+        parsed.deliveryTime, 
+        parsed.note
+      ])
+    }))
     setPage(1)
   }, [search, items])
 
   const openAdd = () => { setEditing(null); setForm(empty); setModal(true) }
   const openEdit = (i: Project) => { 
-    setEditing(i); 
+    setEditing(i)
+    const parsed = parseCombinedNote(i.note || '')
     setForm({ 
       client_name: i.client_name,
       product_id: i.product_id,
       quantity: i.quantity || 1,
+      manager: parsed.manager,
+      delivery_time: parsed.deliveryTime,
+      address: parsed.address,
       spec: i.spec || '',
       status: i.status || '제작중',
-      note: i.note || ''
-    }); 
+      note: parsed.note
+    })
     setModal(true) 
   }
 
@@ -68,12 +123,14 @@ export default function ProjectsPage() {
     setSaving(true)
     try {
       const selectedProduct = products.find(p => p.id === form.product_id)
+      const combinedNote = buildCombinedNote(form.manager, form.delivery_time, form.address, form.note)
+
       const payload = {
         client_name: form.client_name,
         product_id: form.product_id,
         spec: form.spec,
         status: form.status,
-        note: form.note
+        note: combinedNote
       }
 
       if (editing) {
@@ -81,10 +138,10 @@ export default function ProjectsPage() {
         if (error) throw error
         setToast({ msg: '제작/프로젝트가 수정되었습니다.', type: 'success' })
       } else {
-        const { data: newProj, error } = await supabase.from('projects').insert(payload).select('id').single()
+        const { error } = await supabase.from('projects').insert(payload)
         if (error) throw error
 
-        // 2. Auto-deduct materials via BOM on '제작중'
+        // Auto-deduct materials via BOM on '제작중'
         if (form.status === '제작중') {
           const { data: bom } = await supabase.from('bom')
             .select('material_id, quantity')
@@ -148,14 +205,12 @@ export default function ProjectsPage() {
     if (!confirm(`[${project.client_name}] - [${project.product?.name}] 제작 완료건을 현장 출고 처리하시겠습니까?`)) return
     setSaving(true)
     try {
-      // 1. Update project status to 완료
       const { error: projError } = await supabase
         .from('projects')
         .update({ status: '완료' })
         .eq('id', project.id)
       if (projError) throw projError
 
-      // 2. Log in product_shipments table
       const today = new Date().toISOString().slice(0, 10)
       const { error: shipError } = await supabase
         .from('product_shipments')
@@ -164,7 +219,7 @@ export default function ProjectsPage() {
           product_id: project.product_id,
           quantity: project.quantity || 1,
           delivery_company: project.client_name,
-          note: `현장 출고 완료 (${project.spec || ''})`
+          note: `현장 출고 완료 (${project.spec || ''}) ${project.note || ''}`
         })
       if (shipError) throw shipError
 
@@ -235,7 +290,7 @@ export default function ProjectsPage() {
         <div className="toolbar">
           <div className="search-box">
             <span className="search-icon">🔍</span>
-            <input placeholder="납품처, 품목, 규격 검색..." value={search} onChange={e => setSearch(e.target.value)} />
+            <input placeholder="납품처, 품목, 담당자, 주소, 규격 검색..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             {selectedIds.length > 0 && (
@@ -267,44 +322,55 @@ export default function ProjectsPage() {
                         <th>납품처 (고객사)</th>
                         <th>제작 품목</th>
                         <th>제작 수량</th>
-                        <th>규모 / 규격</th>
-                        <th>진행 상태</th>
+                        <th>담당자 / 납품시간</th>
+                        <th>배송 주소</th>
+                        <th>규격 / 상태</th>
                         <th>비고</th>
                         <th>등록일</th>
                         <th>액션</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {paginated.map(i => (
-                        <tr key={i.id}>
-                          <td>
-                            <input type="checkbox" checked={selectedIds.includes(i.id)} onChange={() => handleSelect(i.id)} />
-                          </td>
-                          <td style={{ fontWeight: 600 }}>{i.client_name}</td>
-                          <td className="td-muted">{i.product?.code} | {i.product?.name}</td>
-                          <td className="font-mono">{i.quantity || 1} {i.product?.unit}</td>
-                          <td>{i.spec || '-'}</td>
-                          <td>
-                            <span className={`badge ${i.status === '완료' ? 'badge-active' : 'badge-inactive'}`}>
-                              {i.status}
-                            </span>
-                          </td>
-                          <td className="td-muted">{i.note}</td>
-                          <td className="td-muted">{new Date(i.created_at).toLocaleDateString()}</td>
-                          <td style={{ whiteSpace: 'nowrap' }}>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              {i.status === '제작중' && (
-                                <>
-                                  <button className="btn btn-success btn-sm" onClick={() => handleShipmentComplete(i)}>🚛 현장 출고</button>
-                                  <button className="btn btn-secondary btn-sm" onClick={() => handleSyncBom(i)}>🔄 BOM 재계산</button>
-                                </>
-                              )}
-                              <button className="btn btn-secondary btn-sm" onClick={() => openEdit(i)}>수정</button>
-                              <button className="btn btn-danger btn-sm" onClick={() => handleDelete(i.id)}>삭제</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {paginated.map(i => {
+                        const parsed = parseCombinedNote(i.note || '')
+                        return (
+                          <tr key={i.id}>
+                            <td>
+                              <input type="checkbox" checked={selectedIds.includes(i.id)} onChange={() => handleSelect(i.id)} />
+                            </td>
+                            <td style={{ fontWeight: 600 }}>{i.client_name}</td>
+                            <td className="td-muted">{i.product?.code} | {i.product?.name}</td>
+                            <td className="font-mono">{i.quantity || 1} {i.product?.unit}</td>
+                            <td style={{ fontSize: '13px' }}>
+                              <div>👤 {parsed.manager || '-'}</div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '2px' }}>⏰ {parsed.deliveryTime || '-'}</div>
+                            </td>
+                            <td className="td-muted" style={{ fontSize: '13px', maxWidth: '180px', wordBreak: 'break-all' }}>
+                              📍 {parsed.address || '-'}
+                            </td>
+                            <td>
+                              <div style={{ fontSize: '13px', marginBottom: '4px' }}>{i.spec || '-'}</div>
+                              <span className={`badge ${i.status === '완료' ? 'badge-active' : 'badge-inactive'}`}>
+                                {i.status}
+                              </span>
+                            </td>
+                            <td className="td-muted" style={{ fontSize: '13px' }}>{parsed.note || '-'}</td>
+                            <td className="td-muted">{new Date(i.created_at).toLocaleDateString()}</td>
+                            <td style={{ whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                {i.status === '제작중' && (
+                                  <>
+                                    <button className="btn btn-success btn-sm" onClick={() => handleShipmentComplete(i)}>🚛 현장 출고</button>
+                                    <button className="btn btn-secondary btn-sm" onClick={() => handleSyncBom(i)}>🔄 BOM 재계산</button>
+                                  </>
+                                )}
+                                <button className="btn btn-secondary btn-sm" onClick={() => openEdit(i)}>수정</button>
+                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(i.id)}>삭제</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -341,6 +407,20 @@ export default function ProjectsPage() {
               </div>
               <div className="form-row">
                 <div className="form-group">
+                  <label className="form-label">담당자</label>
+                  <input className="form-control" value={form.manager} onChange={e => setForm(f => ({ ...f, manager: e.target.value }))} placeholder="예: 홍길동 팀장 / 010-1234-5678" />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">납품 (예정) 시간</label>
+                  <input className="form-control" value={form.delivery_time} onChange={e => setForm(f => ({ ...f, delivery_time: e.target.value }))} placeholder="예: 8/15(토) 14:00" />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">배송 주소</label>
+                <input className="form-control" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} placeholder="예: 전북 군산시 산단로 123 군산공장 2동" />
+              </div>
+              <div className="form-row">
+                <div className="form-group">
                   <label className="form-label">규모 / 규격</label>
                   <input className="form-control" value={form.spec} onChange={e => setForm(f => ({ ...f, spec: e.target.value }))} placeholder="예: 접속함 총 3면" />
                 </div>
@@ -354,7 +434,7 @@ export default function ProjectsPage() {
               </div>
               <div className="form-group">
                 <label className="form-label">비고</label>
-                <input className="form-control" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
+                <input className="form-control" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="기타 참고사항" />
               </div>
             </div>
             <div className="modal-footer">

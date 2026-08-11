@@ -135,6 +135,7 @@ export type Project = {
   id: number
   client_name: string
   product_id: number
+  quantity?: number
   spec: string
   status: '제작중' | '완료'
   note: string

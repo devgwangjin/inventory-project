@@ -141,9 +141,9 @@ export default function ShipmentsPage() {
     <div>
       {toast && <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <div className="page-header">
-        <h2>품목 출고 등록</h2>
+        <h2>🚚 품목 출고 이력 관리</h2>
         <div className="page-header-right">
-          <button className="btn btn-primary" onClick={() => { setForm(empty); setModal(true) }}>＋ 출고 등록</button>
+          <button className="btn btn-primary" onClick={() => { setForm(empty); setModal(true) }}>＋ 수기 출고 등록</button>
         </div>
       </div>
       <div className="page-body">
@@ -156,7 +156,7 @@ export default function ShipmentsPage() {
           fontSize: '13px',
           marginBottom: '16px',
         }}>
-          💡 품목 출고 시 BOM에 등록된 구성 자재가 <strong>자동으로 출고 차감</strong>됩니다. BOM 수정 시에는 개별 출고 건의 <strong>[🔄 BOM 재계산]</strong>을 클릭하여 동기화할 수 있습니다.
+          💡 <strong>'제작중 (프로젝트)'</strong> 메뉴에서 제작 완료 후 [🚛 현장 출고]를 누르면 완제품 출고 이력이 이곳에 자동으로 기록됩니다. (필요 시 우측 버튼으로 수기 출고 등록도 가능합니다.)
         </div>
 
         <div className="toolbar">

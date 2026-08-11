@@ -9,7 +9,6 @@ const navItems = [
     section: '대시보드',
     items: [
       { href: '/', icon: '📊', label: '대시보드' },
-      { href: '/projects', icon: '📋', label: '프로젝트 관리' },
     ],
   },
   {
@@ -24,7 +23,8 @@ const navItems = [
   {
     section: '입출고',
     items: [
-      { href: '/transactions', icon: '↕️', label: '자재 입출고' },
+      { href: '/transactions', icon: '⬆️', label: '자재 입출고' },
+      { href: '/projects', icon: '⚙️', label: '제작중 (프로젝트)' },
       { href: '/shipments', icon: '🚚', label: '품목 출고' },
     ],
   },

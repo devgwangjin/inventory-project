@@ -172,6 +172,13 @@ export default function ProjectsPage() {
     if (!confirm(`[${project.product?.name}] 품목의 최신 BOM 기준으로 자재 차감 내역을 재계산하시겠습니까?`)) return
     setSaving(true)
     try {
+      // 1. Delete old material transactions linked to this project/client
+      await supabase
+        .from('material_transactions')
+        .delete()
+        .ilike('note', `%제작 투입%${project.client_name}%`)
+
+      // 2. Fetch current BOM
       const { data: bom, error: bomError } = await supabase
         .from('bom')
         .select('material_id, quantity')
@@ -187,7 +194,7 @@ export default function ProjectsPage() {
           material_id: b.material_id,
           quantity: b.quantity * qty,
           type: 'out',
-          note: `제작 투입 재계산 (${project.client_name} - ${project.product?.name || ''} ${qty}개)`,
+          note: `제작 투입 자동차감 (${project.client_name} - ${project.product?.name || ''} ${qty}개)`,
         }))
         await supabase.from('material_transactions').insert(txInserts)
       }
@@ -232,20 +239,43 @@ export default function ProjectsPage() {
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('이 제작/프로젝트 내역을 삭제하시겠습니까?')) return
-    await supabase.from('projects').delete().eq('id', id)
-    setToast({ msg: '삭제되었습니다.', type: 'success' })
-    load()
+  const handleDelete = async (project: Project & { product: Product }) => {
+    if (!confirm(`[${project.client_name}] - [${project.product?.name}] 제작 내역을 취소/삭제하시겠습니까?\n\n(※ 자동차감되었던 자재들도 원래대로 재고가 자동 복구됩니다.)`)) return
+    setSaving(true)
+    try {
+      // 1. Restore materials by deleting associated material transactions
+      await supabase
+        .from('material_transactions')
+        .delete()
+        .ilike('note', `%제작 투입%${project.client_name}%`)
+
+      // 2. Delete project
+      const { error } = await supabase.from('projects').delete().eq('id', project.id)
+      if (error) throw error
+
+      setToast({ msg: '제작 건이 취소되고 차감되었던 자재 재고가 원상복구되었습니다.', type: 'success' })
+      load()
+    } catch (e: any) {
+      setToast({ msg: e.message || '삭제 실패', type: 'error' })
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleBulkDelete = async () => {
     if (!selectedIds.length) return
-    if (!confirm(`선택한 ${selectedIds.length}개의 프로젝트를 삭제하시겠습니까?`)) return
+    if (!confirm(`선택한 ${selectedIds.length}개의 제작 내역을 취소/삭제하시겠습니까?\n(자동 차감되었던 자재들도 원상복구됩니다.)`)) return
     try {
+      const selectedProjects = items.filter(i => selectedIds.includes(i.id))
+      for (const p of selectedProjects) {
+        await supabase
+          .from('material_transactions')
+          .delete()
+          .ilike('note', `%제작 투입%${p.client_name}%`)
+      }
       const { error } = await supabase.from('projects').delete().in('id', selectedIds)
       if (error) throw error
-      setToast({ msg: `${selectedIds.length}개가 삭제되었습니다.`, type: 'success' })
+      setToast({ msg: `${selectedIds.length}개 제작 건이 삭제되고 자재 재고가 원상복구되었습니다.`, type: 'success' })
       setSelectedIds([])
       load()
     } catch (e: any) {
@@ -365,7 +395,7 @@ export default function ProjectsPage() {
                                   </>
                                 )}
                                 <button className="btn btn-secondary btn-sm" onClick={() => openEdit(i)}>수정</button>
-                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(i.id)}>삭제</button>
+                                <button className="btn btn-danger btn-sm" onClick={() => handleDelete(i)}>삭제</button>
                               </div>
                             </td>
                           </tr>

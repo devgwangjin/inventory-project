@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Pagination from '@/components/Pagination'
 import { supabase, ProductShipment, Client, Product } from '@/lib/supabase'
 import Toast from '@/components/Toast'
+import { logAction } from '@/lib/logger'
 
 const empty = {
   date: new Date().toISOString().slice(0, 10),
@@ -52,6 +53,7 @@ export default function ShipmentsPage() {
     if (!form.product_id || form.quantity <= 0) return
     setSaving(true)
     try {
+      const selectedProd = products.find(p => p.id === form.product_id)
       // 1. Insert shipment and get ID
       const { data: newShipment, error } = await supabase.from('product_shipments').insert({
         ...form,
@@ -78,6 +80,13 @@ export default function ShipmentsPage() {
         await supabase.from('material_transactions').insert(txInserts)
       }
 
+      await logAction({
+        category: '품목출고',
+        actionType: '등록',
+        targetName: form.delivery_company || selectedProd?.name || '완제품',
+        details: `수기 품목 출고 등록: [${selectedProd?.name}] ${form.quantity}${selectedProd?.unit || '개'} (납품처: ${form.delivery_company || '미지정'})`,
+      })
+
       setToast({ msg: `품목 출고가 등록되었습니다. BOM 자재 ${bom?.length || 0}종 자동 차감.`, type: 'success' })
       setModal(false)
       setForm(empty)
@@ -88,8 +97,17 @@ export default function ShipmentsPage() {
   }
 
   const handleDelete = async (id: number) => {
+    const targetShipment = items.find(s => s.id === id)
     if (!confirm('이 출고 내역을 삭제하시겠습니까?\n(자동 차감되었던 자재 내역들도 함께 자동 삭제 및 복구됩니다.)')) return
     await supabase.from('product_shipments').delete().eq('id', id)
+
+    await logAction({
+      category: '품목출고',
+      actionType: '삭제',
+      targetName: targetShipment?.delivery_company || targetShipment?.product?.name || `출고 ID:${id}`,
+      details: `품목 출고 내역 삭제: [${targetShipment?.product?.name}] ${targetShipment?.quantity || 0}개 (납품처: ${targetShipment?.delivery_company || '미지정'})`,
+    })
+
     setToast({ msg: '출고 내역 및 연동된 자재 기록이 삭제되었습니다.', type: 'success' })
     load()
   }

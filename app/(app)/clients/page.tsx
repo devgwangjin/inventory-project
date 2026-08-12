@@ -5,6 +5,7 @@ import { supabase, Client } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import Papa from 'papaparse'
 import { matchesSearch } from '@/lib/search'
+import { logAction } from '@/lib/logger'
 
 const UNITS = ['EA', 'BOX', '캔', 'kg', '포', '봉', 'SET']
 const empty: Omit<Client, 'id' | 'created_at'> = {
@@ -56,10 +57,22 @@ export default function ClientsPage() {
       if (editing) {
         const { error } = await supabase.from('clients').update(form).eq('id', editing.id)
         if (error) throw error
+        await logAction({
+          category: '거래처',
+          actionType: '수정',
+          targetName: form.name,
+          details: `거래처 [${form.name}] (코드: ${form.code}) 정보가 수정되었습니다.`,
+        })
         setToast({ msg: '거래처가 수정되었습니다.', type: 'success' })
       } else {
         const { error } = await supabase.from('clients').insert(form)
         if (error) throw error
+        await logAction({
+          category: '거래처',
+          actionType: '등록',
+          targetName: form.name,
+          details: `신규 거래처 [${form.name}] (코드: ${form.code}) 등록`,
+        })
         setToast({ msg: '거래처가 등록되었습니다.', type: 'success' })
       }
       setModal(false); load()
@@ -67,9 +80,17 @@ export default function ClientsPage() {
       setToast({ msg: e.message || '저장 실패', type: 'error' })
     } finally { setSaving(false) }
   }
+
   const handleDelete = async (id: number) => {
+    const target = clients.find(c => c.id === id)
     if (!confirm('이 거래처를 삭제하시겠습니까?')) return
     await supabase.from('clients').delete().eq('id', id)
+    await logAction({
+      category: '거래처',
+      actionType: '삭제',
+      targetName: target?.name || `거래처 ID:${id}`,
+      details: `거래처 [${target?.name || id}] 삭제 완료`,
+    })
     setToast({ msg: '삭제되었습니다.', type: 'success' })
     load()
   }
@@ -78,8 +99,15 @@ export default function ClientsPage() {
     if (!selectedIds.length) return
     if (!confirm(`선택한 ${selectedIds.length}개의 거래처를 삭제하시겠습니까?`)) return
     try {
+      const selectedNames = clients.filter(c => selectedIds.includes(c.id)).map(c => c.name).join(', ')
       const { error } = await supabase.from('clients').delete().in('id', selectedIds)
       if (error) throw error
+      await logAction({
+        category: '거래처',
+        actionType: '삭제',
+        targetName: `${selectedIds.length}개 거래처`,
+        details: `일괄 삭제: ${selectedNames}`,
+      })
       setToast({ msg: `${selectedIds.length}개가 삭제되었습니다.`, type: 'success' })
       setSelectedIds([])
       load()

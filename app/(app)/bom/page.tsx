@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase, Product, Material, BomItem } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import { matchesSearch } from '@/lib/search'
+import { logAction } from '@/lib/logger'
 
 export default function BomPage() {
   const [products, setProducts] = useState<Product[]>([])
@@ -68,6 +69,12 @@ export default function BomPage() {
       if (error) throw error
       
       setBomItems(prev => [...prev, data as any])
+      await logAction({
+        category: 'BOM',
+        actionType: '등록',
+        targetName: selectedProductObj?.name || '완제품',
+        details: `[${selectedProductObj?.name}] BOM에 구성 자재 [${m.name}] (기본 수량 1개) 추가`,
+      })
       setToast({ msg: `${m.name} 자재가 추가되었습니다.`, type: 'success' })
     } catch (e: any) {
       setToast({ msg: e.message, type: 'error' })
@@ -81,14 +88,30 @@ export default function BomPage() {
   )
 
   const handleUpdateQty = async (bomId: number, qty: number) => {
+    const item = bomItems.find(b => b.id === bomId)
     setBomItems(prev => prev.map(b => b.id === bomId ? { ...b, quantity: qty } : b))
     await supabase.from('bom').update({ quantity: qty }).eq('id', bomId)
+    if (item) {
+      await logAction({
+        category: 'BOM',
+        actionType: '수정',
+        targetName: selectedProductObj?.name || '완제품',
+        details: `[${selectedProductObj?.name}] BOM의 자재 [${item.material?.name}] 필요 수량 변경: ${qty}개`,
+      })
+    }
   }
 
   const handleDelete = async (bomId: number) => {
+    const item = bomItems.find(b => b.id === bomId)
     if (!confirm('이 자재를 BOM에서 제거하시겠습니까?')) return
     setBomItems(prev => prev.filter(b => b.id !== bomId))
     await supabase.from('bom').delete().eq('id', bomId)
+    await logAction({
+      category: 'BOM',
+      actionType: '삭제',
+      targetName: selectedProductObj?.name || '완제품',
+      details: `[${selectedProductObj?.name}] BOM에서 자재 [${item?.material?.name || bomId}] 제거`,
+    })
     setToast({ msg: '제거되었습니다.', type: 'success' })
   }
 

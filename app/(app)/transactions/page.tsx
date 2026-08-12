@@ -4,6 +4,7 @@ import Pagination from '@/components/Pagination'
 import { supabase, MaterialTransaction, Client, Material } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import SearchableSelect from '@/components/SearchableSelect'
+import { logAction } from '@/lib/logger'
 
 const empty = {
   date: new Date().toISOString().slice(0, 10),
@@ -179,11 +180,21 @@ export default function TransactionsPage() {
     if (!form.material_id || form.quantity <= 0) return
     setSaving(true)
     try {
+      const selectedMat = materials.find(m => m.id === form.material_id)
+      const selectedCli = clients.find(c => c.id === form.client_id)
       const { error } = await supabase.from('material_transactions').insert({
         ...form,
         client_id: form.client_id || null,
       })
       if (error) throw error
+
+      await logAction({
+        category: '자재입출고',
+        actionType: '등록',
+        targetName: selectedMat?.name || '자재',
+        details: `자재 수기 ${form.type === 'in' ? '입고' : '출고'} 등록: [${selectedMat?.name}] ${form.quantity}${selectedMat?.unit || '개'} (거래처: ${selectedCli?.name || '미지정'})`,
+      })
+
       setToast({ msg: `${form.type === 'in' ? '입고' : '출고'}가 등록되었습니다.`, type: 'success' })
       setModal(false)
       setForm(empty)
@@ -201,6 +212,7 @@ export default function TransactionsPage() {
     }
     setSaving(true)
     try {
+      const selectedCli = clients.find(c => c.id === bulkClientId)
       const rows = bulkItems.map(item => ({
         date: bulkDate,
         client_id: bulkClientId,
@@ -212,6 +224,18 @@ export default function TransactionsPage() {
 
       const { error } = await supabase.from('material_transactions').insert(rows)
       if (error) throw error
+
+      const summaryStr = bulkItems.map(i => {
+        const m = materials.find(x => x.id === i.materialId)
+        return `${m?.name || '자재'} ${i.quantity}개`
+      }).join(', ')
+
+      await logAction({
+        category: '자재입출고',
+        actionType: '등록',
+        targetName: selectedCli?.name || '카톡붙여넣기',
+        details: `카카오톡 텍스트 일괄 ${bulkType === 'in' ? '입고' : '출고'} (${rows.length}건): ${summaryStr}`,
+      })
 
       setToast({ msg: `카톡 복사 내용 ${rows.length}건이 성공적으로 일괄 등록되었습니다.`, type: 'success' })
       setBulkModal(false)
@@ -225,8 +249,15 @@ export default function TransactionsPage() {
   }
 
   const handleDelete = async (id: number) => {
+    const targetTx = items.find(i => i.id === id)
     if (!confirm('이 내역을 삭제하시겠습니까?')) return
     await supabase.from('material_transactions').delete().eq('id', id)
+    await logAction({
+      category: '자재입출고',
+      actionType: '삭제',
+      targetName: targetTx?.material?.name || `자재내역 ID:${id}`,
+      details: `자재 입출고 내역 삭제: [${targetTx?.material?.name || id}] ${targetTx?.type === 'in' ? '입고' : '출고'} ${targetTx?.quantity || 0}개`,
+    })
     setToast({ msg: '삭제되었습니다.', type: 'success' })
     load()
   }

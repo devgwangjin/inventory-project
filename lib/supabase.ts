@@ -152,3 +152,15 @@ export type ProductShipmentWithProduct = ProductShipment & {
   client?: Client
 }
 
+export type SystemLog = {
+  id: number
+  category: '거래처' | '품목' | '자재' | 'BOM' | '자재입출고' | '제작중' | '품목출고'
+  action_type: '등록' | '수정' | '삭제' | '출고' | '재계산'
+  target_name: string
+  details: string
+  user_name: string
+  created_at: string
+}
+
+
+

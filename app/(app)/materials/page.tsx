@@ -5,6 +5,7 @@ import { supabase, Material } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import Papa from 'papaparse'
 import { matchesSearch } from '@/lib/search'
+import { logAction } from '@/lib/logger'
 
 const UNITS = ['EA', 'BOX', '캔', 'kg', '포', '봉', 'SET']
 const empty: Omit<Material, 'id' | 'created_at'> = {
@@ -132,6 +133,12 @@ export default function MaterialsPage() {
       setTempStockValue('')
       setFlashingId(item.id)
       setTimeout(() => setFlashingId(null), 900)
+      await logAction({
+        category: '자재',
+        actionType: '수정',
+        targetName: item.name,
+        details: `자재 [${item.name}] 재고 실사 조정: ${currentStock}개 ➔ ${newStock}개 (변동: ${diff > 0 ? `+${diff}` : diff}개)`,
+      })
       setToast({ msg: `${item.name} 재고가 ${newStock.toLocaleString()}개로 수정되었습니다.`, type: 'success' })
     } catch (e: any) {
       setToast({ msg: e.message || '재고 수정 실패', type: 'error' })
@@ -169,6 +176,12 @@ export default function MaterialsPage() {
       if (editing) {
         const { error } = await supabase.from('materials').update(form).eq('id', editing.id)
         if (error) throw error
+        await logAction({
+          category: '자재',
+          actionType: '수정',
+          targetName: form.name,
+          details: `자재 [${form.name}] (코드: ${form.code}) 정보 수정`,
+        })
         setToast({ msg: '자재가 수정되었습니다.', type: 'success' })
       } else if (shiftCodes) {
         // 코드 파싱
@@ -204,10 +217,22 @@ export default function MaterialsPage() {
         // 새 자재 등록
         const { error } = await supabase.from('materials').insert(form)
         if (error) throw error
+        await logAction({
+          category: '자재',
+          actionType: '등록',
+          targetName: form.name,
+          details: `신규 자재 [${form.name}] (코드: ${form.code}, 초기재고: ${form.initial_stock}${form.unit}, 안전재고: ${form.safety_stock}${form.unit}) 등록`,
+        })
         setToast({ msg: `자재가 등록되었습니다.${conflicting.length > 0 ? ` ${conflicting.length}개의 코드가 밀렸습니다.` : ''}`, type: 'success' })
       } else {
         const { error } = await supabase.from('materials').insert(form)
         if (error) throw error
+        await logAction({
+          category: '자재',
+          actionType: '등록',
+          targetName: form.name,
+          details: `신규 자재 [${form.name}] (코드: ${form.code}, 초기재고: ${form.initial_stock}${form.unit}) 등록`,
+        })
         setToast({ msg: '자재가 등록되었습니다.', type: 'success' })
       }
       setModal(false); load()
@@ -225,6 +250,13 @@ export default function MaterialsPage() {
       // 1. 자재 삭제
       const { error } = await supabase.from('materials').delete().eq('id', id)
       if (error) throw error
+
+      await logAction({
+        category: '자재',
+        actionType: '삭제',
+        targetName: targetItem.name,
+        details: `자재 [${targetItem.name}] (코드: ${targetItem.code}) 삭제 완료`,
+      })
 
       // 2. 파싱 가능하면 뒷번호 코드들 앞으로 당겨 정렬
       const parsed = parseCode(targetItem.code)

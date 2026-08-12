@@ -5,6 +5,7 @@ import { supabase, Product } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import Papa from 'papaparse'
 import { matchesSearch } from '@/lib/search'
+import { logAction } from '@/lib/logger'
 
 const UNITS = ['EA', 'BOX', '캔', 'kg', '포', '봉', 'SET']
 const empty: Omit<Product, 'id' | 'created_at'> = {
@@ -52,10 +53,22 @@ export default function ProductsPage() {
       if (editing) {
         const { error } = await supabase.from('products').update(form).eq('id', editing.id)
         if (error) throw error
+        await logAction({
+          category: '품목',
+          actionType: '수정',
+          targetName: form.name,
+          details: `완제품 품목 [${form.name}] (코드: ${form.code}) 정보 수정`,
+        })
         setToast({ msg: '품목이 수정되었습니다.', type: 'success' })
       } else {
         const { error } = await supabase.from('products').insert(form)
         if (error) throw error
+        await logAction({
+          category: '품목',
+          actionType: '등록',
+          targetName: form.name,
+          details: `신규 완제품 품목 [${form.name}] (코드: ${form.code}, 기초재고: ${form.initial_stock}${form.unit}) 등록`,
+        })
         setToast({ msg: '품목이 등록되었습니다.', type: 'success' })
       }
       setModal(false); load()
@@ -65,8 +78,15 @@ export default function ProductsPage() {
   }
 
   const handleDelete = async (id: number) => {
+    const target = items.find(p => p.id === id)
     if (!confirm('이 품목을 삭제하시겠습니까?')) return
     await supabase.from('products').delete().eq('id', id)
+    await logAction({
+      category: '품목',
+      actionType: '삭제',
+      targetName: target?.name || `품목 ID:${id}`,
+      details: `완제품 품목 [${target?.name || id}] 삭제 완료`,
+    })
     setToast({ msg: '삭제되었습니다.', type: 'success' })
     load()
   }
@@ -75,8 +95,15 @@ export default function ProductsPage() {
     if (!selectedIds.length) return
     if (!confirm(`선택한 ${selectedIds.length}개의 품목을 삭제하시겠습니까?`)) return
     try {
+      const selectedNames = items.filter(p => selectedIds.includes(p.id)).map(p => p.name).join(', ')
       const { error } = await supabase.from('products').delete().in('id', selectedIds)
       if (error) throw error
+      await logAction({
+        category: '품목',
+        actionType: '삭제',
+        targetName: `${selectedIds.length}개 품목`,
+        details: `완제품 일괄 삭제: ${selectedNames}`,
+      })
       setToast({ msg: `${selectedIds.length}개가 삭제되었습니다.`, type: 'success' })
       setSelectedIds([])
       load()

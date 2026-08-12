@@ -6,6 +6,7 @@ import Toast from '@/components/Toast'
 import { matchesSearch } from '@/lib/search'
 import { buildCombinedNote, parseCombinedNote } from '@/lib/format'
 import { deductBomMaterials, restoreBomMaterials, recalculateBomMaterials } from '@/lib/bom'
+import { logAction } from '@/lib/logger'
 
 const empty = {
   client_name: '',
@@ -99,20 +100,35 @@ export default function ProjectsPage() {
       if (editing) {
         const { error } = await supabase.from('projects').update(payload).eq('id', editing.id)
         if (error) throw error
+        await logAction({
+          category: '제작중',
+          actionType: '수정',
+          targetName: form.client_name,
+          details: `제작/프로젝트 [${form.client_name} - ${selectedProduct?.name || ''}] 정보 수정`,
+        })
         setToast({ msg: '제작/프로젝트가 수정되었습니다.', type: 'success' })
       } else {
         const { error } = await supabase.from('projects').insert(payload)
         if (error) throw error
 
+        let deductedCount = 0
         // Auto-deduct materials via BOM helper on '제작중'
         if (form.status === '제작중') {
-          await deductBomMaterials({
+          deductedCount = await deductBomMaterials({
             productId: form.product_id,
             quantity: form.quantity,
             clientName: form.client_name,
             productName: selectedProduct?.name || ''
           })
         }
+
+        await logAction({
+          category: '제작중',
+          actionType: '등록',
+          targetName: form.client_name,
+          details: `신규 제작 등록: [${form.client_name}] - ${selectedProduct?.name || ''} ${form.quantity}개 (BOM 자재 ${deductedCount}종 자동 차감)`,
+        })
+
         setToast({ msg: '제작이 등록되었습니다. BOM 자재 자동 차감 적용.', type: 'success' })
       }
       setModal(false); load()
@@ -125,11 +141,17 @@ export default function ProjectsPage() {
     if (!confirm(`[${project.product?.name}] 품목의 최신 BOM 기준으로 자재 차감 내역을 재계산하시겠습니까?`)) return
     setSaving(true)
     try {
-      await recalculateBomMaterials({
+      const count = await recalculateBomMaterials({
         productId: project.product_id,
         quantity: project.quantity || 1,
         clientName: project.client_name,
         productName: project.product?.name || ''
+      })
+      await logAction({
+        category: '제작중',
+        actionType: '재계산',
+        targetName: project.client_name,
+        details: `[${project.client_name} - ${project.product?.name}] BOM 차감 자재 재계산 완료 (자재 ${count}종)`,
       })
       setToast({ msg: `최신 BOM 기준으로 자재 차감이 재계산되었습니다.`, type: 'success' })
       load()
@@ -162,6 +184,13 @@ export default function ProjectsPage() {
         })
       if (shipError) throw shipError
 
+      await logAction({
+        category: '제작중',
+        actionType: '출고',
+        targetName: project.client_name,
+        details: `제작 완료 현장 출고 처리: [${project.client_name}] - ${project.product?.name} ${project.quantity || 1}개`,
+      })
+
       setToast({ msg: '현장 출고 처리가 완료되었습니다. (출고 이력 자동 반영)', type: 'success' })
       load()
     } catch (e: any) {
@@ -182,6 +211,13 @@ export default function ProjectsPage() {
       const { error } = await supabase.from('projects').delete().eq('id', project.id)
       if (error) throw error
 
+      await logAction({
+        category: '제작중',
+        actionType: '삭제',
+        targetName: project.client_name,
+        details: `제작 건 취소/삭제: [${project.client_name} - ${project.product?.name}] (차감 자재 원상복구 완료)`,
+      })
+
       setToast({ msg: '제작 건이 취소되고 차감되었던 자재 재고가 원상복구되었습니다.', type: 'success' })
       load()
     } catch (e: any) {
@@ -201,6 +237,14 @@ export default function ProjectsPage() {
       }
       const { error } = await supabase.from('projects').delete().in('id', selectedIds)
       if (error) throw error
+
+      await logAction({
+        category: '제작중',
+        actionType: '삭제',
+        targetName: `${selectedIds.length}개 제작건`,
+        details: `제작 건 일괄 취소/삭제 (${selectedIds.length}건) 및 자재 원상복구`,
+      })
+
       setToast({ msg: `${selectedIds.length}개 제작 건이 삭제되고 자재 재고가 원상복구되었습니다.`, type: 'success' })
       setSelectedIds([])
       load()

@@ -40,8 +40,11 @@ export default function ProductsPage() {
 
   useEffect(() => {
     setFiltered(items.filter(i => matchesSearch(search, [i.name, i.code])))
-    setPage(1)
   }, [search, items])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search])
 
   const openAdd = () => { setEditing(null); setForm(empty); setModal(true) }
   const openEdit = (i: Product) => { setEditing(i); setForm({ ...i }); setModal(true) }

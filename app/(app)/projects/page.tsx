@@ -61,8 +61,11 @@ export default function ProjectsPage() {
         parsed.note
       ])
     }))
-    setPage(1)
   }, [search, items])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search])
 
   const openAdd = () => { setEditing(null); setForm(empty); setModal(true) }
   const openEdit = (i: Project) => { 

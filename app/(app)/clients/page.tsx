@@ -44,8 +44,11 @@ export default function ClientsPage() {
     setFiltered(clients.filter(c =>
       matchesSearch(search, [c.name, c.code, c.manager, c.business_item])
     ))
-    setPage(1)
   }, [search, clients])
+
+  useEffect(() => {
+    setPage(1)
+  }, [search])
 
   const openAdd = () => { setEditing(null); setForm(empty); setModal(true) }
   const openEdit = (c: Client) => { setEditing(c); setForm({ ...c }); setModal(true) }

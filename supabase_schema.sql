@@ -102,3 +102,8 @@ CREATE TABLE system_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 11. 프로젝트 제작 수량 컬럼 및 자재 차감 외래키 연동
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS quantity NUMERIC DEFAULT 1;
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE CASCADE;
+
+

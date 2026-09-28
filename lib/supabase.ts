@@ -109,6 +109,7 @@ export type MaterialTransaction = {
   id: number
   date: string
   client_id: number | null
+  project_id?: number | null
   material_id: number
   quantity: number
   type: 'in' | 'out'
@@ -135,7 +136,7 @@ export type Project = {
   id: number
   client_name: string
   product_id: number
-  quantity?: number
+  quantity: number
   spec: string
   status: '제작중' | '완료'
   note: string

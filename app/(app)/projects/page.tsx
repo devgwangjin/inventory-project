@@ -95,6 +95,7 @@ export default function ProjectsPage() {
       const payload = {
         client_name: form.client_name,
         product_id: form.product_id,
+        quantity: form.quantity,
         spec: form.spec,
         status: form.status,
         note: combinedNote
@@ -103,21 +104,34 @@ export default function ProjectsPage() {
       if (editing) {
         const { error } = await supabase.from('projects').update(payload).eq('id', editing.id)
         if (error) throw error
+
+        // If product or quantity changed while in '제작중', automatically sync BOM!
+        if (form.status === '제작중' && (editing.product_id !== form.product_id || editing.quantity !== form.quantity)) {
+          await recalculateBomMaterials({
+            projectId: editing.id,
+            productId: form.product_id,
+            quantity: form.quantity,
+            clientName: form.client_name,
+            productName: selectedProduct?.name || ''
+          })
+        }
+
         await logAction({
           category: '제작중',
           actionType: '수정',
           targetName: form.client_name,
-          details: `제작/프로젝트 [${form.client_name} - ${selectedProduct?.name || ''}] 정보 수정`,
+          details: `제작/프로젝트 [${form.client_name} - ${selectedProduct?.name || ''}] ${form.quantity}개 정보 수정`,
         })
         setToast({ msg: '제작/프로젝트가 수정되었습니다.', type: 'success' })
       } else {
-        const { error } = await supabase.from('projects').insert(payload)
+        const { data: newProject, error } = await supabase.from('projects').insert(payload).select('id').single()
         if (error) throw error
 
         let deductedCount = 0
         // Auto-deduct materials via BOM helper on '제작중'
-        if (form.status === '제작중') {
+        if (form.status === '제작중' && newProject) {
           deductedCount = await deductBomMaterials({
+            projectId: newProject.id,
             productId: form.product_id,
             quantity: form.quantity,
             clientName: form.client_name,
@@ -132,7 +146,7 @@ export default function ProjectsPage() {
           details: `신규 제작 등록: [${form.client_name}] - ${selectedProduct?.name || ''} ${form.quantity}개 (BOM 자재 ${deductedCount}종 자동 차감)`,
         })
 
-        setToast({ msg: '제작이 등록되었습니다. BOM 자재 자동 차감 적용.', type: 'success' })
+        setToast({ msg: `제작이 등록되었습니다. (완제품 ${form.quantity}개, BOM 자재 자동 차감)`, type: 'success' })
       }
       setModal(false); load()
     } catch (e: any) {
@@ -141,12 +155,14 @@ export default function ProjectsPage() {
   }
 
   const handleSyncBom = async (project: ProjectWithProduct) => {
-    if (!confirm(`[${project.product?.name}] 품목의 최신 BOM 기준으로 자재 차감 내역을 재계산하시겠습니까?`)) return
+    const qty = project.quantity || 1
+    if (!confirm(`[${project.client_name} - ${project.product?.name} ${qty}개] 최신 BOM 기준으로 자재 차감 내역을 재계산하시겠습니까?`)) return
     setSaving(true)
     try {
       const count = await recalculateBomMaterials({
+        projectId: project.id,
         productId: project.product_id,
-        quantity: project.quantity || 1,
+        quantity: qty,
         clientName: project.client_name,
         productName: project.product?.name || ''
       })
@@ -154,7 +170,7 @@ export default function ProjectsPage() {
         category: '제작중',
         actionType: '재계산',
         targetName: project.client_name,
-        details: `[${project.client_name} - ${project.product?.name}] BOM 차감 자재 재계산 완료 (자재 ${count}종)`,
+        details: `[${project.client_name} - ${project.product?.name} ${qty}개] BOM 차감 자재 재계산 완료 (자재 ${count}종)`,
       })
       setToast({ msg: `최신 BOM 기준으로 자재 차감이 재계산되었습니다.`, type: 'success' })
       load()
@@ -166,7 +182,8 @@ export default function ProjectsPage() {
   }
 
   const handleShipmentComplete = async (project: ProjectWithProduct) => {
-    if (!confirm(`[${project.client_name}] - [${project.product?.name}] 제작 완료건을 현장 출고 처리하시겠습니까?`)) return
+    const qty = project.quantity || 1
+    if (!confirm(`[${project.client_name}] - [${project.product?.name} ${qty}개] 제작 완료건을 현장 출고 처리하시겠습니까?`)) return
     setSaving(true)
     try {
       const { error: projError } = await supabase
@@ -181,7 +198,7 @@ export default function ProjectsPage() {
         .insert({
           date: today,
           product_id: project.product_id,
-          quantity: project.quantity || 1,
+          quantity: qty,
           delivery_company: project.client_name,
           note: `현장 출고 완료 (${project.spec || ''}) ${project.note || ''}`
         })
@@ -191,10 +208,10 @@ export default function ProjectsPage() {
         category: '제작중',
         actionType: '출고',
         targetName: project.client_name,
-        details: `제작 완료 현장 출고 처리: [${project.client_name}] - ${project.product?.name} ${project.quantity || 1}개`,
+        details: `제작 완료 현장 출고 처리: [${project.client_name}] - ${project.product?.name} ${qty}개`,
       })
 
-      setToast({ msg: '현장 출고 처리가 완료되었습니다. (출고 이력 자동 반영)', type: 'success' })
+      setToast({ msg: `현장 출고 처리가 완료되었습니다. (${qty}개 출고 이력 자동 반영)`, type: 'success' })
       load()
     } catch (e: any) {
       setToast({ msg: e.message, type: 'error' })
@@ -207,8 +224,8 @@ export default function ProjectsPage() {
     if (!confirm(`[${project.client_name}] - [${project.product?.name}] 제작 내역을 취소/삭제하시겠습니까?\n\n(※ 자동차감되었던 자재들도 원래대로 재고가 자동 복구됩니다.)`)) return
     setSaving(true)
     try {
-      // Restore materials using BOM helper
-      await restoreBomMaterials(project.client_name)
+      // Restore materials using BOM helper with precise project.id
+      await restoreBomMaterials(project.id, project.client_name)
 
       // Delete project
       const { error } = await supabase.from('projects').delete().eq('id', project.id)
@@ -236,7 +253,7 @@ export default function ProjectsPage() {
     try {
       const selectedProjects = items.filter(i => selectedIds.includes(i.id))
       for (const p of selectedProjects) {
-        await restoreBomMaterials(p.client_name)
+        await restoreBomMaterials(p.id, p.client_name)
       }
       const { error } = await supabase.from('projects').delete().in('id', selectedIds)
       if (error) throw error

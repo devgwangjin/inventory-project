@@ -67,7 +67,7 @@ export default function InventoryPage() {
           <div className="search-box" style={{ maxWidth: '320px', minWidth: '240px' }}>
             <span className="search-icon">🔍</span>
             <input 
-              placeholder={tab === 'material' ? "자재명, 현장 자재명, 비고, 코드 검색..." : "품목명, 코드 검색..."} 
+              placeholder={tab === 'material' ? "자재명, 다른 이름, 비고, 코드 검색..." : "품목명, 코드 검색..."} 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
             />
@@ -83,7 +83,7 @@ export default function InventoryPage() {
                     <tr>
                       <th>코드</th>
                       <th>자재명</th>
-                      <th>현장 자재명</th>
+                      <th>다른 이름</th>
                       <th>비고</th>
                       <th>단위</th>
                       <th className="text-right">현재고</th>

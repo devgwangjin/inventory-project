@@ -84,7 +84,7 @@ export default function BomPage() {
   }
 
   const filteredMaterials = materials.filter(m => 
-    matchesSearch(searchKeyword, [m.name, m.code, m.note])
+    matchesSearch(searchKeyword, [m.name, m.code, m.field_name, m.note])
   )
 
   const handleUpdateQty = async (bomId: number, qty: number) => {
@@ -198,7 +198,7 @@ export default function BomPage() {
                             onMouseLeave={e => { if (!isAdded) e.currentTarget.style.background = 'transparent' }}
                           >
                             <span>
-                              {m.code} | {m.name} {m.note && <span style={{ color: 'var(--accent, #60a5fa)', fontSize: '12px' }}>({m.note})</span>} ({m.unit})
+                              {m.code} | {m.name} {(m.field_name || m.note) && <span style={{ color: 'var(--accent, #60a5fa)', fontSize: '12px' }}>({m.field_name || m.note})</span>} ({m.unit})
                             </span>
                             {isAdded && <span className="badge badge-active">✓ 추가됨</span>}
                           </li>
@@ -226,7 +226,7 @@ export default function BomPage() {
                         <tr>
                           <th>순번</th>
                           <th>자재코드</th>
-                          <th>자재명 (현장명)</th>
+                          <th>자재명 (다른 이름)</th>
                           <th>단위</th>
                           <th className="text-right">구성수량</th>
                           <th></th>
@@ -239,9 +239,9 @@ export default function BomPage() {
                             <td><span className="td-code">{b.material.code}</span></td>
                             <td>
                               <span style={{ fontWeight: 500 }}>{b.material.name}</span>
-                              {b.material.note && (
+                              {(b.material.field_name || b.material.note) && (
                                 <span style={{ marginLeft: '6px', color: 'var(--accent, #60a5fa)', fontSize: '12px' }}>
-                                  ({b.material.note})
+                                  ({b.material.field_name || b.material.note})
                                 </span>
                               )}
                             </td>

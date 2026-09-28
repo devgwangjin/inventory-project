@@ -454,7 +454,7 @@ export default function MaterialsPage() {
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flex: 1 }}>
             <div className="search-box">
               <span className="search-icon">🔍</span>
-              <input placeholder="자재명, 코드 검색..." value={search} onChange={e => setSearch(e.target.value)} />
+              <input placeholder="자재명, 다른 이름, 코드 검색..." value={search} onChange={e => setSearch(e.target.value)} />
             </div>
             <button
               className={`btn-filter-shortage ${onlyShortage ? 'active' : ''}`}
@@ -498,7 +498,7 @@ export default function MaterialsPage() {
                         </th>
                         <th>코드</th>
                         <th>자재명</th>
-                        <th>현장 자재명</th>
+                        <th>다른 이름</th>
                         <th>비고</th>
                         <th>단위</th>
                         <th className="text-right">현재고</th>
@@ -612,8 +612,8 @@ export default function MaterialsPage() {
                 <input className="form-control" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
               <div className="form-group">
-                <label className="form-label">현장 자재명</label>
-                <input className="form-control" value={form.field_name || ''} onChange={e => setForm(f => ({ ...f, field_name: e.target.value }))} placeholder="현장에서 부르는 별칭 (예: 200A 단자 등)" />
+                <label className="form-label">다른 이름</label>
+                <input className="form-control" value={form.field_name || ''} onChange={e => setForm(f => ({ ...f, field_name: e.target.value }))} placeholder="현장 호칭, 별칭 등 다른 이름 (예: 200A 단자 등)" />
               </div>
               <div className="form-row">
                 <div className="form-group">

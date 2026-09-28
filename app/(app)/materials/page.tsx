@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import Pagination from '@/components/Pagination'
 import { supabase, Material } from '@/lib/supabase'
 import Toast from '@/components/Toast'
@@ -37,10 +37,21 @@ export default function MaterialsPage() {
   const [isPrinting, setIsPrinting] = useState(false)
   const [printData, setPrintData] = useState<Material[]>([])
   const [shiftCodes, setShiftCodes] = useState(false)
+
+  // 현재고 인라인 편집 상태
   const [editingStockId, setEditingStockId] = useState<number | null>(null)
   const [tempStockValue, setTempStockValue] = useState('')
   const [flashingId, setFlashingId] = useState<number | null>(null)
   const [savingStock, setSavingStock] = useState(false)
+  const isSubmittingStockRef = useRef(false)
+
+  // 다른 이름 인라인 편집 상태
+  const [editingFieldId, setEditingFieldId] = useState<number | null>(null)
+  const [tempFieldValue, setTempFieldValue] = useState('')
+  const [flashingFieldId, setFlashingFieldId] = useState<number | null>(null)
+  const [savingField, setSavingField] = useState(false)
+  const isSubmittingFieldRef = useRef(false)
+
   const [onlyShortage, setOnlyShortage] = useState(false)
   const [onlyZeroStock, setOnlyZeroStock] = useState(false)
   const PER_PAGE = 20
@@ -69,8 +80,75 @@ export default function MaterialsPage() {
 
   useEffect(() => { load() }, [load])
 
+  const startEditField = (item: Material) => {
+    if (savingField) return
+    setEditingStockId(null)
+    setEditingFieldId(item.id)
+    setTempFieldValue(item.field_name || '')
+  }
+
+  const cancelEditField = () => {
+    setEditingFieldId(null)
+    setTempFieldValue('')
+  }
+
+  const moveToNextField = (currentId: number) => {
+    const list = isPrinting ? printData : filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+    const idx = list.findIndex(p => p.id === currentId)
+    if (idx !== -1 && idx + 1 < list.length) {
+      setTimeout(() => startEditField(list[idx + 1]), 60)
+    }
+  }
+
+  const handleFieldUpdate = async (item: Material, moveToNextRow = false) => {
+    if (isSubmittingFieldRef.current) return
+    isSubmittingFieldRef.current = true
+    setTimeout(() => { isSubmittingFieldRef.current = false }, 250)
+
+    const newVal = tempFieldValue.trim()
+    const currentVal = (item.field_name || '').trim()
+
+    if (newVal === currentVal) {
+      cancelEditField()
+      if (moveToNextRow) moveToNextField(item.id)
+      return
+    }
+
+    setSavingField(true)
+    try {
+      const { error } = await supabase
+        .from('materials')
+        .update({ field_name: newVal || null })
+        .eq('id', item.id)
+      if (error) throw error
+
+      setItems(prev => prev.map(m => m.id === item.id ? { ...m, field_name: newVal || null } : m))
+      setEditingFieldId(null)
+      setTempFieldValue('')
+      setFlashingFieldId(item.id)
+      setTimeout(() => setFlashingFieldId(null), 900)
+
+      await logAction({
+        category: '자재',
+        actionType: '수정',
+        targetName: item.name,
+        details: `자재 [${item.name}] 다른 이름 변경: "${currentVal || '(없음)'}" ➔ "${newVal || '(삭제)'}"`,
+      })
+      setToast({ msg: `[${item.name}] 다른 이름이 저장되었습니다.`, type: 'success' })
+
+      if (moveToNextRow) {
+        moveToNextField(item.id)
+      }
+    } catch (e: any) {
+      setToast({ msg: e.message || '다른 이름 수정 실패', type: 'error' })
+    } finally {
+      setSavingField(false)
+    }
+  }
+
   const startEditStock = (item: Material) => {
     if (savingStock) return
+    setEditingFieldId(null)
     setEditingStockId(item.id)
     setTempStockValue(String(stockMap[item.id] ?? 0))
   }
@@ -80,7 +158,19 @@ export default function MaterialsPage() {
     setTempStockValue('')
   }
 
-  const handleStockUpdate = async (item: Material) => {
+  const moveToNextStock = (currentId: number) => {
+    const list = isPrinting ? printData : filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
+    const idx = list.findIndex(p => p.id === currentId)
+    if (idx !== -1 && idx + 1 < list.length) {
+      setTimeout(() => startEditStock(list[idx + 1]), 60)
+    }
+  }
+
+  const handleStockUpdate = async (item: Material, moveToNextRow = false) => {
+    if (isSubmittingStockRef.current) return
+    isSubmittingStockRef.current = true
+    setTimeout(() => { isSubmittingStockRef.current = false }, 250)
+
     const newStock = Number(tempStockValue)
     if (isNaN(newStock) || tempStockValue.trim() === '') {
       cancelEditStock()
@@ -90,6 +180,7 @@ export default function MaterialsPage() {
     const diff = newStock - currentStock
     if (diff === 0) {
       cancelEditStock()
+      if (moveToNextRow) moveToNextStock(item.id)
       return
     }
     setSavingStock(true)
@@ -140,6 +231,10 @@ export default function MaterialsPage() {
         details: `자재 [${item.name}] 재고 실사 조정: ${currentStock}개 ➔ ${newStock}개 (변동: ${diff > 0 ? `+${diff}` : diff}개)`,
       })
       setToast({ msg: `${item.name} 재고가 ${newStock.toLocaleString()}개로 수정되었습니다.`, type: 'success' })
+
+      if (moveToNextRow) {
+        moveToNextStock(item.id)
+      }
     } catch (e: any) {
       setToast({ msg: e.message || '재고 수정 실패', type: 'error' })
     } finally {
@@ -480,6 +575,26 @@ export default function MaterialsPage() {
             <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}개</span>
           </div>
         </div>
+
+        {/* 빠른 실사 모드 안내 툴팁 바 */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: 'rgba(96, 165, 250, 0.08)',
+          border: '1px solid rgba(96, 165, 250, 0.25)',
+          borderRadius: '8px',
+          padding: '9px 14px',
+          marginBottom: '12px',
+          fontSize: '13px',
+          color: 'var(--text-secondary)'
+        }}>
+          <span style={{ fontSize: '16px' }}>⚡</span>
+          <span>
+            <strong style={{ color: 'var(--accent, #60a5fa)' }}>빠른 실사 모드:</strong> 표에서 <strong>[다른 이름]</strong> 또는 <strong>[현재고]</strong>를 클릭하면 팝업 없이 바로 수정됩니다! (<kbd style={{ background: 'var(--card, #1e293b)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--border)', fontSize: '11px', color: 'var(--text-primary)' }}>Enter</kbd> 입력 시 자동 저장 후 바로 다음 자재로 이동)
+          </span>
+        </div>
+
         <div className="card" style={{ padding: 0 }}>
           {loading ? <div className="loading-spinner"><div className="spinner" /></div>
             : filtered.length === 0 ? (
@@ -498,10 +613,10 @@ export default function MaterialsPage() {
                         </th>
                         <th>코드</th>
                         <th>자재명</th>
-                        <th>다른 이름</th>
+                        <th>다른 이름 <span style={{ fontSize: '11px', color: 'var(--accent, #60a5fa)', fontWeight: 'normal' }} title="클릭하여 즉시 수정">✏️</span></th>
                         <th>비고</th>
                         <th>단위</th>
-                        <th className="text-right">현재고</th>
+                        <th className="text-right">현재고 <span style={{ fontSize: '11px', color: 'var(--accent, #60a5fa)', fontWeight: 'normal' }} title="클릭하여 즉시 수정">✏️</span></th>
                         <th className="text-right">안전재고</th>
                         <th>상태</th>
                         <th></th>
@@ -515,20 +630,59 @@ export default function MaterialsPage() {
                           </td>
                           <td><span className="td-code">{i.code}</span></td>
                           <td style={{ fontWeight: 600 }}>{i.name}</td>
-                          <td>
-                            {i.field_name ? (
-                              <span style={{ color: 'var(--accent, #60a5fa)', fontWeight: 500, fontSize: '13px' }}>
-                                🏷️ {i.field_name}
-                              </span>
+                          
+                          {/* 다른 이름: 인라인 편집 */}
+                          <td
+                            className={`cell-editable ${editingFieldId !== i.id && !isPrinting ? 'cell-editable-hover' : ''} ${flashingFieldId === i.id ? 'stock-cell-flash' : ''}`}
+                            onClick={() => !isPrinting && editingFieldId !== i.id && startEditField(i)}
+                            title={!isPrinting ? "클릭하여 다른 이름 바로 수정 (Enter: 다음 행)" : undefined}
+                          >
+                            {editingFieldId === i.id ? (
+                              <input
+                                className="field-input-inline"
+                                type="text"
+                                value={tempFieldValue}
+                                placeholder="다른 이름 입력..."
+                                onChange={e => setTempFieldValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleFieldUpdate(i, true)
+                                  }
+                                  if (e.key === 'Tab') {
+                                    e.preventDefault()
+                                    handleFieldUpdate(i, false)
+                                    startEditStock(i)
+                                  }
+                                  if (e.key === 'Escape') cancelEditField()
+                                }}
+                                onBlur={() => handleFieldUpdate(i, false)}
+                                autoFocus
+                                onFocus={e => e.target.select()}
+                                disabled={savingField}
+                              />
                             ) : (
-                              <span className="td-muted" style={{ fontSize: '12px' }}>-</span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                                {i.field_name ? (
+                                  <span style={{ color: 'var(--accent, #60a5fa)', fontWeight: 500, fontSize: '13px' }}>
+                                    🏷️ {i.field_name}
+                                  </span>
+                                ) : (
+                                  <span className="td-muted cell-empty-hint" style={{ fontSize: '12px' }}>-</span>
+                                )}
+                                {!isPrinting && <span className="cell-pencil-icon">✏️</span>}
+                              </div>
                             )}
                           </td>
+
                           <td className="td-muted" style={{ fontSize: '13px' }}>{i.note || '-'}</td>
                           <td className="td-muted">{i.unit}</td>
+
+                          {/* 현재고: 인라인 편집 */}
                           <td
                             className={`text-right font-mono ${getStockClass(i)} ${editingStockId !== i.id && !isPrinting ? 'stock-cell-editable' : ''} ${flashingId === i.id ? 'stock-cell-flash' : ''}`}
                             onClick={() => !isPrinting && editingStockId !== i.id && startEditStock(i)}
+                            title={!isPrinting ? "클릭하여 현재고 바로 수정 (Enter: 다음 행)" : undefined}
                           >
                             {editingStockId === i.id ? (
                               <input
@@ -537,16 +691,22 @@ export default function MaterialsPage() {
                                 value={tempStockValue}
                                 onChange={e => setTempStockValue(e.target.value)}
                                 onKeyDown={e => {
-                                  if (e.key === 'Enter') handleStockUpdate(i)
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault()
+                                    handleStockUpdate(i, true)
+                                  }
                                   if (e.key === 'Escape') cancelEditStock()
                                 }}
-                                onBlur={() => handleStockUpdate(i)}
+                                onBlur={() => handleStockUpdate(i, false)}
                                 autoFocus
                                 onFocus={e => e.target.select()}
                                 disabled={savingStock}
                               />
                             ) : (
-                              (stockMap[i.id] ?? 0).toLocaleString()
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                                <span>{(stockMap[i.id] ?? 0).toLocaleString()}</span>
+                                {!isPrinting && <span className="cell-pencil-icon">✏️</span>}
+                              </div>
                             )}
                           </td>
                           <td className="text-right font-mono td-muted">{i.safety_stock?.toLocaleString()}</td>

@@ -956,7 +956,61 @@ tbody td {
   display: none;
 }
 
-/* ===== INLINE STOCK EDITING ===== */
+/* ===== INLINE STOCK & OTHER NAME EDITING ===== */
+.cell-editable {
+  position: relative;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  min-width: 140px;
+  padding: 4px 8px !important;
+}
+
+.cell-editable-hover {
+  cursor: pointer;
+}
+
+.cell-editable-hover:hover {
+  background: rgba(96, 165, 250, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.3);
+}
+
+.cell-pencil-icon {
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  color: var(--text-muted);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.cell-editable-hover:hover .cell-pencil-icon,
+.stock-cell-editable:hover .cell-pencil-icon {
+  opacity: 0.8;
+}
+
+.cell-editable-hover:hover .cell-empty-hint {
+  color: var(--accent, #60a5fa) !important;
+  text-decoration: underline;
+}
+
+.field-input-inline {
+  width: 100%;
+  min-width: 130px;
+  padding: 4px 8px;
+  background: var(--bg-primary);
+  border: 1.5px solid var(--accent, #60a5fa);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2), 0 2px 8px rgba(0, 0, 0, 0.3);
+  animation: fadeIn 0.12s ease;
+}
+
+.field-input-inline:focus {
+  border-color: var(--accent, #60a5fa);
+}
+
 .stock-cell-editable {
   position: relative;
   cursor: pointer;
@@ -971,7 +1025,7 @@ tbody td {
 }
 
 .stock-input-inline {
-  width: 80px;
+  width: 90px;
   padding: 4px 8px;
   background: var(--bg-primary);
   border: 1.5px solid var(--accent);

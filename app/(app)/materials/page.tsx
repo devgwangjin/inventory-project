@@ -52,7 +52,7 @@ export default function MaterialsPage() {
 
     // Calculate current stock
     if (data && data.length > 0) {
-      const { data: txs } = await supabase.from('material_transactions').select('material_id, type, quantity')
+      const { data: txs } = await supabase.from('material_transactions').select('material_id, type, quantity').limit(50000)
       const map: Record<number, number> = {}
       for (const m of data) map[m.id] = m.initial_stock || 0
       if (txs) {

@@ -14,8 +14,8 @@ export default function InventoryPage() {
       const [{ data: mats }, { data: prods }, { data: matTx }, { data: prodTx }] = await Promise.all([
         supabase.from('materials').select('*').eq('is_active', true).order('code'),
         supabase.from('products').select('*').eq('is_active', true).order('code'),
-        supabase.from('material_transactions').select('material_id, type, quantity'),
-        supabase.from('product_shipments').select('product_id, quantity')
+        supabase.from('material_transactions').select('material_id, type, quantity').limit(50000),
+        supabase.from('product_shipments').select('product_id, quantity').limit(50000)
       ])
 
       const matStock: Record<number, number> = {}

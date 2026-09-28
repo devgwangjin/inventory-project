@@ -70,13 +70,13 @@ function parseKakaoText(text: string, materials: Material[], clients: Client[]) 
   // 2. Parse item lines
   let currentNote = ''
   const itemLines = lines.slice(1)
-  const lineRegex = /^(.*?)\s+(\d+)\s*(EA|ea|개|BOX|box|캔|kg|포|봉|SET|set)?$/i
+  const lineRegex = /^(.*?)\s+([\d,]+)\s*(EA|ea|개|BOX|box|캔|kg|포|봉|SET|set)?$/i
 
   for (const line of itemLines) {
     const match = line.match(lineRegex)
     if (match) {
       const itemName = match[1].trim()
-      const quantity = Number(match[2])
+      const quantity = Number(match[2].replace(/,/g, ''))
 
       const matchedMaterial = materials.find(m =>
         m.name.toLowerCase().replace(/\s+/g, '') === itemName.toLowerCase().replace(/\s+/g, '') ||

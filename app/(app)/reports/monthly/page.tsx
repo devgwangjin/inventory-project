@@ -11,7 +11,7 @@ export default function MonthlyReportPage() {
     const load = async () => {
       setLoading(true)
       const { data: mats } = await supabase.from('materials').select('*').eq('is_active', true).order('code')
-      const { data: txs } = await supabase.from('material_transactions').select('material_id, type, quantity, date')
+      const { data: txs } = await supabase.from('material_transactions').select('material_id, type, quantity, date').limit(50000)
 
       const result = []
       for (const m of mats || []) {

@@ -183,7 +183,7 @@ export default function DashboardPage() {
               <span className="card-title">{year}년 월별 입출고 현황</span>
             </div>
             <div className="chart-container" style={{ height: 240 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={stats.monthlyData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
@@ -205,7 +205,7 @@ export default function DashboardPage() {
               <span className="card-title">{year}년 품목 출고 동향</span>
             </div>
             <div className="chart-container" style={{ height: 240 }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={stats.productMonthlyData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />

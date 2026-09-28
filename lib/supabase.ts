@@ -88,6 +88,7 @@ export type Material = {
   id: number
   code: string
   name: string
+  field_name?: string | null
   unit: string
   initial_stock: number
   safety_stock: number

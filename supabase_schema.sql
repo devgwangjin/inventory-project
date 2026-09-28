@@ -106,4 +106,7 @@ CREATE TABLE system_logs (
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS quantity NUMERIC DEFAULT 1;
 ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES projects(id) ON DELETE CASCADE;
 
+-- 12. 자재 테이블에 현장 자재명(별칭) 컬럼 추가
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS field_name TEXT;
+
 

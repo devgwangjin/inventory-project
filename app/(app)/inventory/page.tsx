@@ -43,7 +43,7 @@ export default function InventoryPage() {
   }, [])
 
   const filteredMaterials = materials.filter(m => 
-    matchesSearch(search, [m.code, m.name, m.note, m.unit])
+    matchesSearch(search, [m.code, m.name, m.field_name, m.note, m.unit])
   )
 
   const filteredProducts = products.filter(p => 
@@ -67,7 +67,7 @@ export default function InventoryPage() {
           <div className="search-box" style={{ maxWidth: '320px', minWidth: '240px' }}>
             <span className="search-icon">🔍</span>
             <input 
-              placeholder={tab === 'material' ? "자재명, 현장명(비고), 코드 검색..." : "품목명, 코드 검색..."} 
+              placeholder={tab === 'material' ? "자재명, 현장 자재명, 비고, 코드 검색..." : "품목명, 코드 검색..."} 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
             />
@@ -83,7 +83,8 @@ export default function InventoryPage() {
                     <tr>
                       <th>코드</th>
                       <th>자재명</th>
-                      <th style={{ minWidth: '160px' }}>현장 자재명 (비고)</th>
+                      <th>현장 자재명</th>
+                      <th>비고</th>
                       <th>단위</th>
                       <th className="text-right">현재고</th>
                       <th className="text-right">안전재고</th>
@@ -101,20 +102,21 @@ export default function InventoryPage() {
                 <tbody>
                   {tab === 'material' ? (
                     filteredMaterials.length === 0 ? (
-                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: '30px' }} className="td-muted">일치하는 자재가 없습니다.</td></tr>
+                      <tr><td colSpan={8} style={{ textAlign: 'center', padding: '30px' }} className="td-muted">일치하는 자재가 없습니다.</td></tr>
                     ) : filteredMaterials.map(m => (
                       <tr key={m.id}>
                         <td><span className="td-code">{m.code}</span></td>
                         <td style={{ fontWeight: 600 }}>{m.name}</td>
                         <td>
-                          {m.note ? (
+                          {m.field_name ? (
                             <span style={{ color: 'var(--accent, #60a5fa)', fontWeight: 500, fontSize: '13px' }}>
-                              🏷️ {m.note}
+                              🏷️ {m.field_name}
                             </span>
                           ) : (
                             <span className="td-muted" style={{ fontSize: '12px' }}>-</span>
                           )}
                         </td>
+                        <td className="td-muted" style={{ fontSize: '13px' }}>{m.note || '-'}</td>
                         <td className="td-muted">{m.unit}</td>
                         <td className={`text-right font-mono ${m.current_stock <= m.safety_stock ? 'stock-danger' : 'stock-ok'}`}>
                           {m.current_stock.toLocaleString()}

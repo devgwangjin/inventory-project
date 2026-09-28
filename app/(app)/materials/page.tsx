@@ -9,7 +9,7 @@ import { logAction } from '@/lib/logger'
 
 const UNITS = ['EA', 'BOX', '캔', 'kg', '포', '봉', 'SET']
 const empty: Omit<Material, 'id' | 'created_at'> = {
-  code: '', name: '', unit: 'EA', initial_stock: 0, safety_stock: 0, note: '', is_active: true
+  code: '', name: '', field_name: '', unit: 'EA', initial_stock: 0, safety_stock: 0, note: '', is_active: true
 }
 
 function parseCode(code: string): { prefix: string; number: number; padLength: number } | null {
@@ -148,7 +148,7 @@ export default function MaterialsPage() {
   }
 
   useEffect(() => {
-    let result = items.filter(i => matchesSearch(search, [i.name, i.code]))
+    let result = items.filter(i => matchesSearch(search, [i.name, i.code, i.field_name, i.note]))
     if (onlyShortage) {
       result = result.filter(i => (stockMap[i.id] ?? 0) <= (i.safety_stock || 0))
     } else if (onlyZeroStock) {
@@ -498,7 +498,8 @@ export default function MaterialsPage() {
                         </th>
                         <th>코드</th>
                         <th>자재명</th>
-                        <th>현장 자재명 (비고)</th>
+                        <th>현장 자재명</th>
+                        <th>비고</th>
                         <th>단위</th>
                         <th className="text-right">현재고</th>
                         <th className="text-right">안전재고</th>
@@ -515,14 +516,15 @@ export default function MaterialsPage() {
                           <td><span className="td-code">{i.code}</span></td>
                           <td style={{ fontWeight: 600 }}>{i.name}</td>
                           <td>
-                            {i.note ? (
+                            {i.field_name ? (
                               <span style={{ color: 'var(--accent, #60a5fa)', fontWeight: 500, fontSize: '13px' }}>
-                                🏷️ {i.note}
+                                🏷️ {i.field_name}
                               </span>
                             ) : (
                               <span className="td-muted" style={{ fontSize: '12px' }}>-</span>
                             )}
                           </td>
+                          <td className="td-muted" style={{ fontSize: '13px' }}>{i.note || '-'}</td>
                           <td className="td-muted">{i.unit}</td>
                           <td
                             className={`text-right font-mono ${getStockClass(i)} ${editingStockId !== i.id && !isPrinting ? 'stock-cell-editable' : ''} ${flashingId === i.id ? 'stock-cell-flash' : ''}`}
@@ -609,6 +611,10 @@ export default function MaterialsPage() {
                 <label className="form-label">자재명 <span className="required">*</span></label>
                 <input className="form-control" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
               </div>
+              <div className="form-group">
+                <label className="form-label">현장 자재명</label>
+                <input className="form-control" value={form.field_name || ''} onChange={e => setForm(f => ({ ...f, field_name: e.target.value }))} placeholder="현장에서 부르는 별칭 (예: 200A 단자 등)" />
+              </div>
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">초기 재고</label>
@@ -620,8 +626,8 @@ export default function MaterialsPage() {
                 </div>
               </div>
               <div className="form-group">
-                <label className="form-label">현장 자재명 / 비고</label>
-                <input className="form-control" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="현장에서 부르는 별칭이나 특이사항 (예: 200A 단자 등)" />
+                <label className="form-label">비고</label>
+                <input className="form-control" value={form.note || ''} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="발주 기준 등 메모 (예: 발주후 5주)" />
               </div>
               <div className="form-group">
                 <label className="form-label">상태</label>

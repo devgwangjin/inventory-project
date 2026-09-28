@@ -1,12 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase, Material, Product } from '@/lib/supabase'
+import { matchesSearch } from '@/lib/search'
 
 export default function InventoryPage() {
   const [tab, setTab] = useState<'material' | 'product'>('material')
   const [materials, setMaterials] = useState<(Material & { current_stock: number })[]>([])
   const [products, setProducts] = useState<(Product & { current_stock: number })[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -40,6 +42,14 @@ export default function InventoryPage() {
     load()
   }, [])
 
+  const filteredMaterials = materials.filter(m => 
+    matchesSearch(search, [m.code, m.name, m.note, m.unit])
+  )
+
+  const filteredProducts = products.filter(p => 
+    matchesSearch(search, [p.code, p.name, p.unit])
+  )
+
   return (
     <div>
       <div className="page-header">
@@ -49,9 +59,19 @@ export default function InventoryPage() {
         </div>
       </div>
       <div className="page-body">
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }} className="no-print">
-          <button className={`btn ${tab === 'material' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('material')}>자재 재고</button>
-          <button className={`btn ${tab === 'product' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('product')}>품목 재고</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }} className="no-print">
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className={`btn ${tab === 'material' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('material')}>자재 재고</button>
+            <button className={`btn ${tab === 'product' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('product')}>품목 재고</button>
+          </div>
+          <div className="search-box" style={{ maxWidth: '320px', minWidth: '240px' }}>
+            <span className="search-icon">🔍</span>
+            <input 
+              placeholder={tab === 'material' ? "자재명, 현장명(비고), 코드 검색..." : "품목명, 코드 검색..."} 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
+            />
+          </div>
         </div>
 
         <div className="card" style={{ padding: 0 }}>
@@ -63,6 +83,7 @@ export default function InventoryPage() {
                     <tr>
                       <th>코드</th>
                       <th>자재명</th>
+                      <th style={{ minWidth: '160px' }}>현장 자재명 (비고)</th>
                       <th>단위</th>
                       <th className="text-right">현재고</th>
                       <th className="text-right">안전재고</th>
@@ -78,27 +99,44 @@ export default function InventoryPage() {
                   )}
                 </thead>
                 <tbody>
-                  {tab === 'material' ? materials.map(m => (
-                    <tr key={m.id}>
-                      <td><span className="td-code">{m.code}</span></td>
-                      <td style={{ fontWeight: 600 }}>{m.name}</td>
-                      <td className="td-muted">{m.unit}</td>
-                      <td className={`text-right font-mono ${m.current_stock <= m.safety_stock ? 'stock-danger' : 'stock-ok'}`}>
-                        {m.current_stock.toLocaleString()}
-                      </td>
-                      <td className="text-right font-mono td-muted">{m.safety_stock.toLocaleString()}</td>
-                      <td>
-                        {m.current_stock <= m.safety_stock && <span className="badge badge-out">부족</span>}
-                      </td>
-                    </tr>
-                  )) : products.map(p => (
-                    <tr key={p.id}>
-                      <td><span className="td-code">{p.code}</span></td>
-                      <td style={{ fontWeight: 600 }}>{p.name}</td>
-                      <td className="td-muted">{p.unit}</td>
-                      <td className="text-right font-mono stock-ok">{p.current_stock.toLocaleString()}</td>
-                    </tr>
-                  ))}
+                  {tab === 'material' ? (
+                    filteredMaterials.length === 0 ? (
+                      <tr><td colSpan={7} style={{ textAlign: 'center', padding: '30px' }} className="td-muted">일치하는 자재가 없습니다.</td></tr>
+                    ) : filteredMaterials.map(m => (
+                      <tr key={m.id}>
+                        <td><span className="td-code">{m.code}</span></td>
+                        <td style={{ fontWeight: 600 }}>{m.name}</td>
+                        <td>
+                          {m.note ? (
+                            <span style={{ color: 'var(--accent, #60a5fa)', fontWeight: 500, fontSize: '13px' }}>
+                              🏷️ {m.note}
+                            </span>
+                          ) : (
+                            <span className="td-muted" style={{ fontSize: '12px' }}>-</span>
+                          )}
+                        </td>
+                        <td className="td-muted">{m.unit}</td>
+                        <td className={`text-right font-mono ${m.current_stock <= m.safety_stock ? 'stock-danger' : 'stock-ok'}`}>
+                          {m.current_stock.toLocaleString()}
+                        </td>
+                        <td className="text-right font-mono td-muted">{m.safety_stock.toLocaleString()}</td>
+                        <td>
+                          {m.current_stock <= m.safety_stock && <span className="badge badge-out">부족</span>}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    filteredProducts.length === 0 ? (
+                      <tr><td colSpan={4} style={{ textAlign: 'center', padding: '30px' }} className="td-muted">일치하는 품목이 없습니다.</td></tr>
+                    ) : filteredProducts.map(p => (
+                      <tr key={p.id}>
+                        <td><span className="td-code">{p.code}</span></td>
+                        <td style={{ fontWeight: 600 }}>{p.name}</td>
+                        <td className="td-muted">{p.unit}</td>
+                        <td className="text-right font-mono stock-ok">{p.current_stock.toLocaleString()}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

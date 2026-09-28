@@ -498,10 +498,10 @@ export default function MaterialsPage() {
                         </th>
                         <th>코드</th>
                         <th>자재명</th>
+                        <th>현장 자재명 (비고)</th>
                         <th>단위</th>
                         <th className="text-right">현재고</th>
                         <th className="text-right">안전재고</th>
-                        <th>비고</th>
                         <th>상태</th>
                         <th></th>
                       </tr>
@@ -514,6 +514,15 @@ export default function MaterialsPage() {
                           </td>
                           <td><span className="td-code">{i.code}</span></td>
                           <td style={{ fontWeight: 600 }}>{i.name}</td>
+                          <td>
+                            {i.note ? (
+                              <span style={{ color: 'var(--accent, #60a5fa)', fontWeight: 500, fontSize: '13px' }}>
+                                🏷️ {i.note}
+                              </span>
+                            ) : (
+                              <span className="td-muted" style={{ fontSize: '12px' }}>-</span>
+                            )}
+                          </td>
                           <td className="td-muted">{i.unit}</td>
                           <td
                             className={`text-right font-mono ${getStockClass(i)} ${editingStockId !== i.id && !isPrinting ? 'stock-cell-editable' : ''} ${flashingId === i.id ? 'stock-cell-flash' : ''}`}
@@ -539,7 +548,6 @@ export default function MaterialsPage() {
                             )}
                           </td>
                           <td className="text-right font-mono td-muted">{i.safety_stock?.toLocaleString()}</td>
-                          <td className="td-muted">{i.note}</td>
                           <td><span className={`badge ${i.is_active ? 'badge-active' : 'badge-inactive'}`}>{i.is_active ? '사용' : '미사용'}</span></td>
                           <td>
                             <div style={{ display: 'flex', gap: '6px' }}>
@@ -612,8 +620,8 @@ export default function MaterialsPage() {
                 </div>
               </div>
               <div className="form-group">
-                <label className="form-label">비고</label>
-                <input className="form-control" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="발주 기준 등" />
+                <label className="form-label">현장 자재명 / 비고</label>
+                <input className="form-control" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="현장에서 부르는 별칭이나 특이사항 (예: 200A 단자 등)" />
               </div>
               <div className="form-group">
                 <label className="form-label">상태</label>

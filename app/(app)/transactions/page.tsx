@@ -81,8 +81,10 @@ function parseKakaoText(text: string, materials: Material[], clients: Client[]) 
       const matchedMaterial = materials.find(m =>
         m.name.toLowerCase().replace(/\s+/g, '') === itemName.toLowerCase().replace(/\s+/g, '') ||
         m.code.toLowerCase().replace(/\s+/g, '') === itemName.toLowerCase().replace(/\s+/g, '') ||
+        (m.note && m.note.toLowerCase().replace(/\s+/g, '') === itemName.toLowerCase().replace(/\s+/g, '')) ||
         m.name.toLowerCase().replace(/\s+/g, '').includes(itemName.toLowerCase().replace(/\s+/g, '')) ||
-        itemName.toLowerCase().replace(/\s+/g, '').includes(m.name.toLowerCase().replace(/\s+/g, ''))
+        itemName.toLowerCase().replace(/\s+/g, '').includes(m.name.toLowerCase().replace(/\s+/g, '')) ||
+        (m.note && m.note.toLowerCase().replace(/\s+/g, '').includes(itemName.toLowerCase().replace(/\s+/g, '')))
       )
 
       items.push({
@@ -459,7 +461,7 @@ export default function TransactionsPage() {
                           <tr key={row.rowId}>
                             <td>
                               <SearchableSelect
-                                options={materials.map(m => ({ id: m.id, code: m.code, name: m.name, unit: m.unit }))}
+                                options={materials.map(m => ({ id: m.id, code: m.code, name: m.name, unit: m.unit, subtext: m.note }))}
                                 value={row.material_id}
                                 onChange={(id) => handleRowChange(row.rowId, 'material_id', id)}
                                 placeholder={`#${idx + 1} 자재를 선택하세요...`}
@@ -601,7 +603,7 @@ export default function TransactionsPage() {
                             <td className="td-muted" style={{ fontSize: '12px', fontFamily: 'monospace' }}>{item.rawText}</td>
                             <td>
                               <SearchableSelect
-                                options={materials.map(m => ({ id: m.id, code: m.code, name: m.name, unit: m.unit }))}
+                                options={materials.map(m => ({ id: m.id, code: m.code, name: m.name, unit: m.unit, subtext: m.note }))}
                                 value={item.materialId}
                                 onChange={id => setBulkItems(prev => prev.map(x => x.id === item.id ? { ...x, materialId: id } : x))}
                                 placeholder="자재 검색..."

@@ -7,6 +7,7 @@ export interface SearchableOption {
   code: string
   name: string
   unit?: string
+  subtext?: string
 }
 
 interface Props {
@@ -27,7 +28,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
   const selected = options.find(o => o.id === value) || null
 
   const filtered = query.trim()
-    ? options.filter(o => matchesSearch(query, [o.code, o.name]))
+    ? options.filter(o => matchesSearch(query, [o.code, o.name, o.subtext]))
     : options
 
   // Reset highlight when filtered list changes
@@ -127,7 +128,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
             onChange={e => setQuery(e.target.value)}
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
-            placeholder={selected ? `${selected.code} | ${selected.name}` : placeholder}
+            placeholder={selected ? `${selected.code} | ${selected.name}${selected.subtext ? ` (${selected.subtext})` : ''}` : placeholder}
             autoComplete="off"
           />
         )}
@@ -149,7 +150,7 @@ export default function SearchableSelect({ options, value, onChange, placeholder
               value={query}
               onChange={e => setQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="코드 또는 자재명 검색..."
+              placeholder="코드, 자재명, 현장명(비고) 검색..."
               autoFocus
               autoComplete="off"
             />
@@ -169,7 +170,14 @@ export default function SearchableSelect({ options, value, onChange, placeholder
                   onMouseDown={e => { e.preventDefault(); handleSelect(opt) }}
                 >
                   <span className="ss-option-code">{opt.code}</span>
-                  <span className="ss-option-name">{opt.name}</span>
+                  <span className="ss-option-name">
+                    {opt.name}
+                    {opt.subtext && (
+                      <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--accent, #60a5fa)', fontWeight: 500 }}>
+                        ({opt.subtext})
+                      </span>
+                    )}
+                  </span>
                   {opt.unit && <span className="ss-option-unit">{opt.unit}</span>}
                 </div>
               ))}

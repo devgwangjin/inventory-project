@@ -111,9 +111,12 @@ export type MaterialTransaction = {
   date: string
   client_id: number | null
   project_id?: number | null
+  product_shipment_id?: number | null
   material_id: number
   quantity: number
   type: 'in' | 'out'
+  transaction_type?: string | null // 'normal' | 'as' | 'internal' | 'sample' | 'scrap'
+  recipient?: string | null
   note: string
   created_at: string
   client?: Client
@@ -125,6 +128,8 @@ export type ProductShipment = {
   date: string
   client_id: number | null
   delivery_company?: string
+  shipment_type?: string | null // 'normal' | 'as' | 'internal' | 'sample' | 'scrap'
+  recipient?: string | null
   product_id: number
   quantity: number
   note: string

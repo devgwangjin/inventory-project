@@ -111,6 +111,26 @@ function parseKakaoText(text: string, materials: Material[], clients: Client[]) 
   }
 }
 
+const TX_OUT_TYPES = [
+  { key: 'normal', label: '일반 출고', icon: '🚚', badgeClass: 'badge-out' },
+  { key: 'as', label: 'A/S 수리', icon: '🛠️', badgeClass: 'badge-as' },
+  { key: 'internal', label: '사내 불출', icon: '👤', badgeClass: 'badge-internal' },
+  { key: 'sample', label: '샘플/테스트', icon: '🧪', badgeClass: 'badge-sample' },
+  { key: 'scrap', label: '불량/폐기', icon: '🗑️', badgeClass: 'badge-scrap' },
+]
+
+function getTxBadge(tx: MaterialTransaction) {
+  if (tx.type === 'in') {
+    return <span className="badge badge-in">📥 입고</span>
+  }
+  const t = TX_OUT_TYPES.find(x => x.key === tx.transaction_type) || TX_OUT_TYPES[0]
+  return (
+    <span className={`badge ${t.badgeClass}`} title={tx.recipient ? `수령/담당: ${tx.recipient}` : undefined}>
+      {t.icon} {t.label}
+    </span>
+  )
+}
+
 export default function TransactionsPage() {
   const [items, setItems] = useState<(MaterialTransaction & { client: Client; material: Material })[]>([])
   const [clients, setClients] = useState<Client[]>([])
@@ -119,7 +139,7 @@ export default function TransactionsPage() {
   const [modal, setModal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
-  const [filterType, setFilterType] = useState<'all' | 'in' | 'out'>('all')
+  const [filterType, setFilterType] = useState('all')
   const [filterMonth, setFilterMonth] = useState('')
   const [page, setPage] = useState(1)
   const PER_PAGE = 25
@@ -127,6 +147,8 @@ export default function TransactionsPage() {
   // Multi-material modal state
   const [formDate, setFormDate] = useState(new Date().toISOString().slice(0, 10))
   const [formType, setFormType] = useState<'in' | 'out'>('in')
+  const [formTxType, setFormTxType] = useState('normal')
+  const [formRecipient, setFormRecipient] = useState('')
   const [formClientId, setFormClientId] = useState<number | null>(null)
   const [formCommonNote, setFormCommonNote] = useState('')
   const [materialRows, setMaterialRows] = useState<MultiMaterialRow[]>([
@@ -138,6 +160,8 @@ export default function TransactionsPage() {
   const [pasteText, setPasteText] = useState('')
   const [bulkDate, setBulkDate] = useState(new Date().toISOString().slice(0, 10))
   const [bulkType, setBulkType] = useState<'in' | 'out'>('in')
+  const [bulkTxType, setBulkTxType] = useState('normal')
+  const [bulkRecipient, setBulkRecipient] = useState('')
   const [bulkClientId, setBulkClientId] = useState<number | null>(null)
   const [bulkItems, setBulkItems] = useState<ParsedItem[]>([])
 
@@ -164,6 +188,8 @@ export default function TransactionsPage() {
     if (!pasteText.trim()) {
       setBulkClientId(null)
       setBulkType('in')
+      setBulkTxType('normal')
+      setBulkRecipient('')
       setBulkItems([])
       return
     }
@@ -171,6 +197,8 @@ export default function TransactionsPage() {
     if (parsed) {
       setBulkClientId(parsed.clientId)
       setBulkType(parsed.type)
+      setBulkTxType('normal')
+      setBulkRecipient('')
       setBulkItems(parsed.items)
     }
   }, [pasteText, materials, clients])
@@ -178,6 +206,8 @@ export default function TransactionsPage() {
   const openAddModal = (type: 'in' | 'out' = 'in') => {
     setFormDate(new Date().toISOString().slice(0, 10))
     setFormType(type)
+    setFormTxType('normal')
+    setFormRecipient('')
     setFormClientId(null)
     setFormCommonNote('')
     setMaterialRows([
@@ -203,7 +233,13 @@ export default function TransactionsPage() {
   }
 
   const filtered = items.filter(i => {
-    if (filterType !== 'all' && i.type !== filterType) return false
+    if (filterType === 'in' && i.type !== 'in') return false
+    if (filterType === 'out' && i.type !== 'out') return false
+    if (['normal', 'as', 'internal', 'sample', 'scrap'].includes(filterType)) {
+      if (i.type !== 'out') return false
+      const currentTxType = i.transaction_type || 'normal'
+      if (currentTxType !== filterType) return false
+    }
     if (filterMonth && !i.date.startsWith(filterMonth)) return false
     return true
   })
@@ -220,13 +256,20 @@ export default function TransactionsPage() {
     setSaving(true)
     try {
       const selectedCli = clients.find(c => c.id === formClientId)
+      const typeObj = TX_OUT_TYPES.find(t => t.key === formTxType) || TX_OUT_TYPES[0]
+      const typeTag = formType === 'out' && formTxType !== 'normal' 
+        ? `[${typeObj.label}${formRecipient ? ': ' + formRecipient : ''}] `
+        : ''
+
       const insertRows = materialRows.map(r => ({
         date: formDate,
         type: formType,
+        transaction_type: formType === 'out' ? (formTxType || 'normal') : null,
+        recipient: formType === 'out' ? (formRecipient || null) : null,
         client_id: formClientId || null,
         material_id: r.material_id!,
         quantity: r.quantity,
-        note: r.note ? (formCommonNote ? `${r.note} (${formCommonNote})` : r.note) : formCommonNote,
+        note: (typeTag + (r.note ? (formCommonNote ? `${r.note} (${formCommonNote})` : r.note) : formCommonNote)).trim(),
       }))
 
       const { error } = await supabase.from('material_transactions').insert(insertRows)
@@ -237,14 +280,17 @@ export default function TransactionsPage() {
         return `${m?.name || '자재'} ${r.quantity}${m?.unit || '개'}`
       }).join(', ')
 
+      const logTarget = formRecipient || selectedCli?.name || '자재일괄등록'
+      const logActionLabel = formType === 'in' ? '입고' : `출고 (${typeObj.label})`
+
       await logAction({
         category: '자재입출고',
         actionType: '등록',
-        targetName: selectedCli?.name || '자재일괄등록',
-        details: `자재 수기 ${formType === 'in' ? '입고' : '출고'} (${insertRows.length}종): ${summaryStr} (거래처: ${selectedCli?.name || '미지정'})`,
+        targetName: logTarget,
+        details: `자재 수기 ${logActionLabel} (${insertRows.length}종): ${summaryStr} (거래처/수령인: ${formRecipient || selectedCli?.name || '미지정'})`,
       })
 
-      setToast({ msg: `자재 ${insertRows.length}종 ${formType === 'in' ? '입고' : '출고'}가 성공적으로 등록되었습니다.`, type: 'success' })
+      setToast({ msg: `자재 ${insertRows.length}종 ${formType === 'in' ? '입고' : `출고 [${typeObj.label}]`}가 성공적으로 등록되었습니다.`, type: 'success' })
       setModal(false)
       load()
     } catch (e: any) {
@@ -261,13 +307,20 @@ export default function TransactionsPage() {
     setSaving(true)
     try {
       const selectedCli = clients.find(c => c.id === bulkClientId)
+      const typeObj = TX_OUT_TYPES.find(t => t.key === bulkTxType) || TX_OUT_TYPES[0]
+      const typeTag = bulkType === 'out' && bulkTxType !== 'normal'
+        ? `[${typeObj.label}${bulkRecipient ? ': ' + bulkRecipient : ''}] `
+        : ''
+
       const rows = bulkItems.map(item => ({
         date: bulkDate,
         client_id: bulkClientId,
         material_id: item.materialId,
         quantity: item.quantity,
         type: bulkType,
-        note: item.note ? `${item.note} (카톡자동등록)` : '카톡자동등록',
+        transaction_type: bulkType === 'out' ? (bulkTxType || 'normal') : null,
+        recipient: bulkType === 'out' ? (bulkRecipient || null) : null,
+        note: (typeTag + (item.note ? `${item.note} (카톡자동등록)` : '카톡자동등록')).trim(),
       }))
 
       const { error } = await supabase.from('material_transactions').insert(rows)
@@ -281,8 +334,8 @@ export default function TransactionsPage() {
       await logAction({
         category: '자재입출고',
         actionType: '등록',
-        targetName: selectedCli?.name || '카톡붙여넣기',
-        details: `카카오톡 텍스트 일괄 ${bulkType === 'in' ? '입고' : '출고'} (${rows.length}건): ${summaryStr}`,
+        targetName: bulkRecipient || selectedCli?.name || '카톡붙여넣기',
+        details: `카카오톡 텍스트 일괄 ${bulkType === 'in' ? '입고' : `출고 (${typeObj.label})`} (${rows.length}건): ${summaryStr}`,
       })
 
       setToast({ msg: `카톡 복사 내용 ${rows.length}건이 성공적으로 일괄 등록되었습니다.`, type: 'success' })
@@ -321,13 +374,24 @@ export default function TransactionsPage() {
         </div>
       </div>
       <div className="page-body">
-        <div className="toolbar">
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <button className={`btn btn-sm ${filterType === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFilterType('all'); setPage(1) }}>전체</button>
-            <button className={`btn btn-sm ${filterType === 'in' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFilterType('in'); setPage(1) }}>입고</button>
-            <button className={`btn btn-sm ${filterType === 'out' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFilterType('out'); setPage(1) }}>출고</button>
+        <div className="toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              <button className={`btn btn-sm ${filterType === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFilterType('all'); setPage(1) }}>전체</button>
+              <button className={`btn btn-sm ${filterType === 'in' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFilterType('in'); setPage(1) }}>📥 입고</button>
+              <button className={`btn btn-sm ${filterType === 'out' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFilterType('out'); setPage(1) }}>📤 출고 (전체)</button>
+              {TX_OUT_TYPES.map(t => (
+                <button
+                  key={t.key}
+                  className={`btn btn-sm ${filterType === t.key ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => { setFilterType(t.key); setPage(1) }}
+                >
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
+            <input type="month" className="form-control" style={{ width: 'auto' }} value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setPage(1) }} />
           </div>
-          <input type="month" className="form-control" style={{ width: 'auto' }} value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setPage(1) }} />
           <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}건</span>
         </div>
 
@@ -349,7 +413,7 @@ export default function TransactionsPage() {
                         <th>구분</th>
                         <th>자재코드</th>
                         <th>자재명</th>
-                        <th>거래처</th>
+                        <th>거래처 / 수령인</th>
                         <th className="text-right">수량</th>
                         <th>단위</th>
                         <th>비고</th>
@@ -360,10 +424,23 @@ export default function TransactionsPage() {
                       {paginated.map(i => (
                         <tr key={i.id}>
                           <td className="td-muted">{i.date}</td>
-                          <td><span className={`badge ${i.type === 'in' ? 'badge-in' : 'badge-out'}`}>{i.type === 'in' ? '입고' : '출고'}</span></td>
+                          <td>{getTxBadge(i)}</td>
                           <td><span className="td-code">{i.material?.code}</span></td>
                           <td style={{ fontWeight: 500 }}>{i.material?.name}</td>
-                          <td className="td-muted">{i.client?.name || '-'}</td>
+                          <td className="td-muted">
+                            {i.client?.name ? (
+                              <span>{i.client.name}</span>
+                            ) : i.recipient ? (
+                              <span style={{ color: 'var(--accent, #60a5fa)', fontWeight: 500 }}>👤 {i.recipient}</span>
+                            ) : (
+                              <span>-</span>
+                            )}
+                            {i.client?.name && i.recipient && (
+                              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                수령: {i.recipient}
+                              </div>
+                            )}
+                          </td>
                           <td className={`text-right font-mono ${i.type === 'in' ? 'text-green' : 'text-red'}`}>
                             {i.type === 'in' ? '+' : '-'}{i.quantity.toLocaleString()}
                           </td>
@@ -431,8 +508,40 @@ export default function TransactionsPage() {
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">공통 비고 / 메모</label>
-                  <input className="form-control" placeholder="예: 3공장 정기 입고건, 불량품 출고 등" value={formCommonNote} onChange={e => setFormCommonNote(e.target.value)} />
+                  <input className="form-control" placeholder="예: 3공장 정기 입고건, A/S 출장 등" value={formCommonNote} onChange={e => setFormCommonNote(e.target.value)} />
                 </div>
+
+                {formType === 'out' && (
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px dashed var(--border)' }}>
+                    <div className="form-group" style={{ marginBottom: '10px' }}>
+                      <label className="form-label">출고 구분 <span className="required">*</span></label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '6px' }}>
+                        {TX_OUT_TYPES.map(t => (
+                          <button
+                            key={t.key}
+                            type="button"
+                            className={`btn btn-sm ${formTxType === t.key ? 'btn-primary' : 'btn-secondary'}`}
+                            style={{ padding: '6px 4px', fontSize: '12px', justifyContent: 'center' }}
+                            onClick={() => setFormTxType(t.key)}
+                          >
+                            {t.icon} {t.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">
+                        {formTxType === 'internal' ? '수령 직원 / 부서명' : formTxType === 'as' ? 'A/S 담당 직원' : '수령자 / 담당자'}
+                      </label>
+                      <input
+                        className="form-control"
+                        placeholder={formTxType === 'internal' ? '예: 김대리 (생산1팀)' : '예: 홍길동 과장'}
+                        value={formRecipient}
+                        onChange={e => setFormRecipient(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 자재 선택 다중 행 목록 */}
@@ -586,6 +695,36 @@ export default function TransactionsPage() {
                       placeholder="거래처를 검색하여 매칭..."
                     />
                   </div>
+
+                  {bulkType === 'out' && (
+                    <div style={{ padding: '8px 10px', background: 'var(--bg-primary)', borderRadius: '6px', border: '1px solid var(--border)' }}>
+                      <div className="form-group" style={{ marginBottom: '6px' }}>
+                        <label className="form-label" style={{ fontSize: '11.5px', marginBottom: '4px' }}>출고 구분</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(75px, 1fr))', gap: '4px' }}>
+                          {TX_OUT_TYPES.map(t => (
+                            <button
+                              key={t.key}
+                              type="button"
+                              className={`btn btn-sm ${bulkTxType === t.key ? 'btn-primary' : 'btn-secondary'}`}
+                              style={{ padding: '4px 2px', fontSize: '11px', justifyContent: 'center' }}
+                              onClick={() => setBulkTxType(t.key)}
+                            >
+                              {t.icon} {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <input
+                          className="form-control"
+                          style={{ fontSize: '12px', padding: '5px 8px' }}
+                          placeholder={bulkTxType === 'internal' ? '수령 직원 / 부서명' : bulkTxType === 'as' ? 'A/S 담당 직원' : '수령자 / 담당자'}
+                          value={bulkRecipient}
+                          onChange={e => setBulkRecipient(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

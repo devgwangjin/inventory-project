@@ -5,10 +5,29 @@ import { supabase, ProductShipment, Client, Product } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 import { logAction } from '@/lib/logger'
 
+const SHIPMENT_TYPES = [
+  { key: 'normal', label: '정상 납품', icon: '🚚', badgeClass: 'badge-normal' },
+  { key: 'as', label: 'A/S 수리', icon: '🛠️', badgeClass: 'badge-as' },
+  { key: 'internal', label: '사내 불출', icon: '👤', badgeClass: 'badge-internal' },
+  { key: 'sample', label: '샘플/테스트', icon: '🧪', badgeClass: 'badge-sample' },
+  { key: 'scrap', label: '불량/폐기', icon: '🗑️', badgeClass: 'badge-scrap' },
+]
+
+function getShipmentBadge(type?: string | null, recipient?: string | null) {
+  const t = SHIPMENT_TYPES.find(x => x.key === type) || SHIPMENT_TYPES[0]
+  return (
+    <span className={`badge ${t.badgeClass}`} title={recipient ? `수령/담당: ${recipient}` : undefined}>
+      {t.icon} {t.label}
+    </span>
+  )
+}
+
 const empty = {
   date: new Date().toISOString().slice(0, 10),
   client_id: null as number | null,
   delivery_company: '',
+  shipment_type: 'normal',
+  recipient: '',
   product_id: null as number | null,
   quantity: 1,
   note: '',
@@ -24,6 +43,7 @@ export default function ShipmentsPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [filterMonth, setFilterMonth] = useState('')
+  const [filterType, setFilterType] = useState('all')
   const [page, setPage] = useState(1)
   const PER_PAGE = 25
 
@@ -45,7 +65,14 @@ export default function ShipmentsPage() {
 
   useEffect(() => { load() }, [load])
 
-  const filtered = items.filter(i => !filterMonth || i.date.startsWith(filterMonth))
+  const filtered = items.filter(i => {
+    if (filterMonth && !i.date.startsWith(filterMonth)) return false
+    if (filterType !== 'all') {
+      const itemType = i.shipment_type || 'normal'
+      if (itemType !== filterType) return false
+    }
+    return true
+  })
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE)
   const totalPages = Math.ceil(filtered.length / PER_PAGE)
 
@@ -54,11 +81,19 @@ export default function ShipmentsPage() {
     setSaving(true)
     try {
       const selectedProd = products.find(p => p.id === form.product_id)
+      const typeObj = SHIPMENT_TYPES.find(t => t.key === form.shipment_type) || SHIPMENT_TYPES[0]
+      const typeTag = form.shipment_type !== 'normal' ? `[${typeObj.label}${form.recipient ? ': ' + form.recipient : ''}]` : ''
+
       // 1. Insert shipment and get ID
       const { data: newShipment, error } = await supabase.from('product_shipments').insert({
-        ...form,
+        date: form.date,
         client_id: null, // Ignored in UI now, but keeping for backward schema compatibility
         delivery_company: form.delivery_company || null,
+        shipment_type: form.shipment_type || 'normal',
+        recipient: form.recipient || null,
+        product_id: form.product_id,
+        quantity: form.quantity,
+        note: form.note || null,
       }).select('id').single()
       if (error) throw error
 
@@ -75,7 +110,9 @@ export default function ShipmentsPage() {
           product_shipment_id: newShipment.id,
           quantity: b.quantity * form.quantity,
           type: 'out',
-          note: `품목출고 자동차감 (${form.delivery_company || form.note || ''})`,
+          transaction_type: form.shipment_type || 'normal',
+          recipient: form.recipient || null,
+          note: `품목출고 자동차감 ${typeTag} (${form.delivery_company || form.note || ''})`.trim(),
         }))
         await supabase.from('material_transactions').insert(txInserts)
       }
@@ -83,11 +120,11 @@ export default function ShipmentsPage() {
       await logAction({
         category: '품목출고',
         actionType: '등록',
-        targetName: form.delivery_company || selectedProd?.name || '완제품',
-        details: `수기 품목 출고 등록: [${selectedProd?.name}] ${form.quantity}${selectedProd?.unit || '개'} (납품처: ${form.delivery_company || '미지정'})`,
+        targetName: form.delivery_company || form.recipient || selectedProd?.name || '완제품',
+        details: `수기 품목 출고 [${typeObj.label}]: [${selectedProd?.name}] ${form.quantity}${selectedProd?.unit || '개'} (수령/납품: ${form.recipient || form.delivery_company || '미지정'})`,
       })
 
-      setToast({ msg: `품목 출고가 등록되었습니다. BOM 자재 ${bom?.length || 0}종 자동 차감.`, type: 'success' })
+      setToast({ msg: `[${typeObj.label}] 품목 출고가 등록되었습니다. BOM 자재 ${bom?.length || 0}종 자동 차감.`, type: 'success' })
       setModal(false)
       setForm(empty)
       load()
@@ -177,8 +214,27 @@ export default function ShipmentsPage() {
           💡 <strong>'제작중 (프로젝트)'</strong> 메뉴에서 제작 완료 후 [🚛 현장 출고]를 누르면 완제품 출고 이력이 이곳에 자동으로 기록됩니다. (필요 시 우측 버튼으로 수기 출고 등록도 가능합니다.)
         </div>
 
-        <div className="toolbar">
-          <input type="month" className="form-control" style={{ width: 'auto' }} value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setPage(1) }} />
+        <div className="toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <input type="month" className="form-control" style={{ width: 'auto' }} value={filterMonth} onChange={e => { setFilterMonth(e.target.value); setPage(1) }} />
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              <button
+                className={`btn btn-sm ${filterType === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => { setFilterType('all'); setPage(1) }}
+              >
+                전체
+              </button>
+              {SHIPMENT_TYPES.map(t => (
+                <button
+                  key={t.key}
+                  className={`btn btn-sm ${filterType === t.key ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => { setFilterType(t.key); setPage(1) }}
+                >
+                  {t.icon} {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>총 {filtered.length}건</span>
         </div>
 
@@ -196,9 +252,10 @@ export default function ShipmentsPage() {
                     <thead>
                       <tr>
                         <th>날짜</th>
+                        <th>출고 구분</th>
                         <th>품목코드</th>
                         <th>품목명</th>
-                        <th>납품업체</th>
+                        <th>납품처 / 수령인</th>
                         <th className="text-right">수량</th>
                         <th>단위</th>
                         <th>비고</th>
@@ -209,9 +266,25 @@ export default function ShipmentsPage() {
                       {paginated.map(i => (
                         <tr key={i.id}>
                           <td className="td-muted">{i.date}</td>
+                          <td>{getShipmentBadge(i.shipment_type, i.recipient)}</td>
                           <td><span className="td-code">{i.product?.code}</span></td>
                           <td style={{ fontWeight: 500 }}>{i.product?.name}</td>
-                          <td className="td-muted">{i.delivery_company || i.client?.name || '-'}</td>
+                          <td>
+                            {i.delivery_company ? (
+                              <span>{i.delivery_company}</span>
+                            ) : i.recipient ? (
+                              <span style={{ color: 'var(--accent, #60a5fa)', fontWeight: 500 }}>👤 {i.recipient}</span>
+                            ) : i.client?.name ? (
+                              <span>{i.client?.name}</span>
+                            ) : (
+                              <span className="td-muted">-</span>
+                            )}
+                            {i.delivery_company && i.recipient && (
+                              <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                수령: {i.recipient}
+                              </div>
+                            )}
+                          </td>
                           <td className="text-right font-mono text-red">-{i.quantity.toLocaleString()}</td>
                           <td className="td-muted">{i.product?.unit}</td>
                           <td className="td-muted">{i.note}</td>
@@ -238,6 +311,24 @@ export default function ShipmentsPage() {
               <button className="modal-close" onClick={() => setModal(false)}>✕</button>
             </div>
             <div className="modal-body">
+              {/* 출고 구분 선택 */}
+              <div className="form-group">
+                <label className="form-label">출고 구분 <span className="required">*</span></label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '6px' }}>
+                  {SHIPMENT_TYPES.map(t => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      className={`btn btn-sm ${form.shipment_type === t.key ? 'btn-primary' : 'btn-secondary'}`}
+                      style={{ padding: '7px 4px', fontSize: '12.5px', justifyContent: 'center' }}
+                      onClick={() => setForm(f => ({ ...f, shipment_type: t.key }))}
+                    >
+                      {t.icon} {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="form-row">
                 <div className="form-group">
                   <label className="form-label">날짜 <span className="required">*</span></label>
@@ -255,13 +346,33 @@ export default function ShipmentsPage() {
                   {products.map(p => <option key={p.id} value={p.id}>{p.code} | {p.name} ({p.unit})</option>)}
                 </select>
               </div>
-              <div className="form-group">
-                <label className="form-label">납품업체</label>
-                <input className="form-control" value={form.delivery_company} onChange={e => setForm(f => ({ ...f, delivery_company: e.target.value }))} placeholder="예: (주)한국제일전기" />
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">
+                    {form.shipment_type === 'internal' ? '사용처 / 납품처' : '납품업체'}
+                  </label>
+                  <input
+                    className="form-control"
+                    value={form.delivery_company}
+                    onChange={e => setForm(f => ({ ...f, delivery_company: e.target.value }))}
+                    placeholder={form.shipment_type === 'internal' ? '예: 사내 테스트실, 공장' : '예: (주)한국제일전기'}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">
+                    {form.shipment_type === 'internal' ? '수령 직원 / 부서' : form.shipment_type === 'as' ? 'A/S 담당 직원' : '수령자 / 담당자'}
+                  </label>
+                  <input
+                    className="form-control"
+                    value={form.recipient}
+                    onChange={e => setForm(f => ({ ...f, recipient: e.target.value }))}
+                    placeholder={form.shipment_type === 'internal' ? '예: 김대리 (생산1팀)' : '예: 홍길동 과장'}
+                  />
+                </div>
               </div>
               <div className="form-group">
-                <label className="form-label">비고</label>
-                <input className="form-control" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} />
+                <label className="form-label">비고 / 사유</label>
+                <input className="form-control" value={form.note} onChange={e => setForm(f => ({ ...f, note: e.target.value }))} placeholder="상세 출고 사유나 특이사항을 적어주세요" />
               </div>
             </div>
             <div className="modal-footer">

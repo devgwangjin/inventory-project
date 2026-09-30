@@ -109,4 +109,11 @@ ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS project_id BIGINT REF
 -- 12. 자재 테이블에 현장 자재명(별칭) 컬럼 추가
 ALTER TABLE materials ADD COLUMN IF NOT EXISTS field_name TEXT;
 
+-- 13. 품목 출고 및 자재 출고에 출고 유형(A/S, 사내불출 등) 및 수령자 컬럼 추가
+ALTER TABLE product_shipments ADD COLUMN IF NOT EXISTS shipment_type TEXT DEFAULT 'normal';
+ALTER TABLE product_shipments ADD COLUMN IF NOT EXISTS recipient TEXT;
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS transaction_type TEXT DEFAULT 'normal';
+ALTER TABLE material_transactions ADD COLUMN IF NOT EXISTS recipient TEXT;
+
+
 

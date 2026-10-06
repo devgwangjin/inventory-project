@@ -401,7 +401,7 @@ export default function ProjectsPage() {
       </div>
 
       {modal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
               <span className="modal-title">{editing ? '제작/프로젝트 수정' : '제작/프로젝트 등록'}</span>

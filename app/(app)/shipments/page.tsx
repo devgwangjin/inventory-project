@@ -304,7 +304,7 @@ export default function ShipmentsPage() {
       </div>
 
       {modal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
               <span className="modal-title">🚚 품목 출고 등록</span>

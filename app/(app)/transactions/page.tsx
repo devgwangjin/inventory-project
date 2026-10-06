@@ -461,7 +461,7 @@ export default function TransactionsPage() {
       </div>
 
       {modal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '840px', width: '92%' }}>
             <div className="modal-header">
               <span className="modal-title">
@@ -649,7 +649,7 @@ export default function TransactionsPage() {
       )}
 
       {bulkModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setBulkModal(false)}>
+        <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '960px', width: '90%' }}>
             <div className="modal-header">
               <span className="modal-title">💬 카카오톡 텍스트 일괄 등록</span>

@@ -263,7 +263,7 @@ export default function ProductsPage() {
       </div>
 
       {modal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
               <span className="modal-title">{editing ? '품목 수정' : '품목 등록'}</span>
@@ -315,7 +315,7 @@ export default function ProductsPage() {
       )}
 
       {bulkModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setBulkModal(false)}>
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
               <span className="modal-title">품목 대량 등록 (CSV)</span>

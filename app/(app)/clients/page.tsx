@@ -280,7 +280,7 @@ export default function ClientsPage() {
       </div>
 
       {modal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
+        <div className="modal-overlay">
           <div className="modal modal-lg">
             <div className="modal-header">
               <span className="modal-title">{editing ? '거래처 수정' : '거래처 등록'}</span>
@@ -358,7 +358,7 @@ export default function ClientsPage() {
       )}
 
       {bulkModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setBulkModal(false)}>
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
               <span className="modal-title">거래처 대량 등록 (CSV)</span>

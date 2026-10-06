@@ -734,7 +734,7 @@ export default function MaterialsPage() {
       </div>
 
       {modal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setModal(false)}>
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
               <span className="modal-title">{editing ? '자재 수정' : '자재 등록'}</span>
@@ -808,7 +808,7 @@ export default function MaterialsPage() {
       )}
 
       {bulkModal && (
-        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setBulkModal(false)}>
+        <div className="modal-overlay">
           <div className="modal">
             <div className="modal-header">
               <span className="modal-title">자재 대량 등록 (CSV)</span>

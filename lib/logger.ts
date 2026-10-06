@@ -19,15 +19,29 @@ export async function logAction({
   actionType,
   targetName,
   details,
-  userName = '관리자',
+  userName,
 }: LogActionParams) {
+  let resolvedUserName = userName
+  if (!resolvedUserName && typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('inventory_user_identity')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (parsed && parsed.name) resolvedUserName = parsed.name
+      }
+    } catch { /* fall through */ }
+  }
+  if (!resolvedUserName) {
+    resolvedUserName = '관리자'
+  }
+
   try {
     const { error } = await supabase.from('system_logs').insert({
       category,
       action_type: actionType,
       target_name: targetName,
       details,
-      user_name: userName,
+      user_name: resolvedUserName,
     })
     if (error) {
       console.warn('System log insert notice:', error.message)

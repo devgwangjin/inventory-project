@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useOnlineUsers } from '@/hooks/useOnlineUsers'
 
 const navItems = [
@@ -46,6 +46,7 @@ export default function Sidebar() {
   const router = useRouter()
   const { users, myIdentity, editingName, setEditingName, updateName } = useOnlineUsers()
   const [tempName, setTempName] = useState('')
+  const submittingRef = useRef(false)
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -53,17 +54,26 @@ export default function Sidebar() {
     router.refresh()
   }
 
-  const startEditName = () => {
+  const startEditName = (e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    submittingRef.current = false
     setTempName(myIdentity.name)
     setEditingName(true)
   }
 
   const handleNameSubmit = () => {
-    if (tempName.trim()) {
-      updateName(tempName)
+    if (submittingRef.current) return
+    submittingRef.current = true
+    const trimmed = tempName.trim()
+    if (trimmed) {
+      updateName(trimmed)
     } else {
       setEditingName(false)
     }
+    setTimeout(() => { submittingRef.current = false }, 150)
   }
 
   return (
@@ -110,7 +120,13 @@ export default function Sidebar() {
           </div>
           <div className="online-users-list">
             {users.map(u => (
-              <div key={u.id} className={`online-user-item ${u.isMe ? 'is-me' : ''}`}>
+              <div
+                key={u.id}
+                className={`online-user-item ${u.isMe ? 'is-me' : ''}`}
+                onClick={() => { if (u.isMe && !editingName) startEditName() }}
+                style={{ cursor: u.isMe && !editingName ? 'pointer' : 'default' }}
+                title={u.isMe && !editingName ? '클릭하여 내 이름 변경' : undefined}
+              >
                 <span className="online-user-icon">{u.icon}</span>
                 {u.isMe && editingName ? (
                   <input
@@ -118,21 +134,36 @@ export default function Sidebar() {
                     value={tempName}
                     onChange={e => setTempName(e.target.value)}
                     onKeyDown={e => {
-                      if (e.key === 'Enter') handleNameSubmit()
-                      if (e.key === 'Escape') setEditingName(false)
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleNameSubmit()
+                      }
+                      if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setEditingName(false)
+                      }
                     }}
                     onBlur={handleNameSubmit}
+                    onClick={e => e.stopPropagation()}
                     autoFocus
                     maxLength={12}
+                    placeholder="이름 입력 (최대 12자)"
                   />
                 ) : (
                   <span className="online-user-name">
-                    {u.name}
+                    {u.isMe ? myIdentity.name : u.name}
                     {u.isMe && <span className="online-me-tag">나</span>}
                   </span>
                 )}
                 {u.isMe && !editingName && (
-                  <button className="online-edit-btn" onClick={startEditName} title="별명 변경">✏️</button>
+                  <button
+                    type="button"
+                    className="online-edit-btn"
+                    onClick={startEditName}
+                    title="이름 변경"
+                  >
+                    ✏️
+                  </button>
                 )}
               </div>
             ))}

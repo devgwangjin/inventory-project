@@ -1523,14 +1523,14 @@ tbody td {
   background: none;
   cursor: pointer;
   font-size: 11px;
-  padding: 2px;
-  opacity: 0;
+  padding: 2px 4px;
+  opacity: 0.5;
   transition: opacity 0.15s ease;
   flex-shrink: 0;
 }
 
 .online-user-item:hover .online-edit-btn {
-  opacity: 0.6;
+  opacity: 0.85;
 }
 
 .online-edit-btn:hover {

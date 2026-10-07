@@ -20,7 +20,7 @@ export default function BomPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [materials, setMaterials] = useState<Material[]>([])
   const [selectedProduct, setSelectedProduct] = useState<number | ''>('')
-  const [bomItems, setBomItems] = useState<(BomItem & { material: Material })[]>([])
+  const [bomItems, setBomItems] = useState<BomWithMaterial[]>([])
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -29,11 +29,14 @@ export default function BomPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
+  // BOM 등록 여부 필터 ('all' | 'unregistered' | 'registered')
+  const [filterStatus, setFilterStatus] = useState<'all' | 'unregistered' | 'registered'>('all')
+
   // BOM 복사/불러오기 모달 관련 상태
   const [copyModal, setCopyModal] = useState(false)
   const [bomCountMap, setBomCountMap] = useState<Record<number, number>>({})
   const [sourceProductId, setSourceProductId] = useState<number | ''>('')
-  const [sourceBomPreview, setSourceBomPreview] = useState<(BomItem & { material: Material })[]>([])
+  const [sourceBomPreview, setSourceBomPreview] = useState<BomWithMaterial[]>([])
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [copyMode, setCopyMode] = useState<'replace' | 'append'>('replace')
   const [copying, setCopying] = useState(false)
@@ -49,12 +52,19 @@ export default function BomPage() {
   }, [])
 
   const loadBase = useCallback(async () => {
-    const [{ data: prods }, { data: mats }] = await Promise.all([
+    const [{ data: prods }, { data: mats }, { data: boms }] = await Promise.all([
       supabase.from('products').select('*').eq('is_active', true).order('code'),
       supabase.from('materials').select('*').eq('is_active', true).order('code'),
+      supabase.from('bom').select('product_id'),
     ])
     setProducts(prods || [])
     setMaterials(mats || [])
+
+    const countMap: Record<number, number> = {}
+    boms?.forEach(b => {
+      countMap[b.product_id] = (countMap[b.product_id] || 0) + 1
+    })
+    setBomCountMap(countMap)
   }, [])
 
   const loadBom = useCallback(async (productId: number, showSpinner = true) => {
@@ -67,6 +77,7 @@ export default function BomPage() {
     // 자재코드 ABC순 자동 정렬
     const sorted = sortBomItems((data || []) as any)
     setBomItems(sorted)
+    setBomCountMap(prev => ({ ...prev, [productId]: sorted.length }))
     if (showSpinner) setLoading(false)
   }, [])
 
@@ -91,7 +102,11 @@ export default function BomPage() {
       if (error) throw error
       
       // 추가 후 자재코드 ABC순 자동 정렬
-      setBomItems(prev => sortBomItems([...prev, data as any]))
+      setBomItems(prev => {
+        const next = sortBomItems([...prev, data as any])
+        setBomCountMap(old => ({ ...old, [Number(selectedProduct)]: next.length }))
+        return next
+      })
       await logAction({
         category: 'BOM',
         actionType: '등록',
@@ -127,7 +142,13 @@ export default function BomPage() {
   const handleDelete = async (bomId: number) => {
     const item = bomItems.find(b => b.id === bomId)
     if (!confirm('이 자재를 BOM에서 제거하시겠습니까?')) return
-    setBomItems(prev => prev.filter(b => b.id !== bomId))
+    setBomItems(prev => {
+      const next = prev.filter(b => b.id !== bomId)
+      if (selectedProduct) {
+        setBomCountMap(old => ({ ...old, [Number(selectedProduct)]: next.length }))
+      }
+      return next
+    })
     await supabase.from('bom').delete().eq('id', bomId)
     await logAction({
       category: 'BOM',
@@ -138,15 +159,18 @@ export default function BomPage() {
     setToast({ msg: '제거되었습니다.', type: 'success' })
   }
 
-  // 다른 품목 BOM 복사 모달 열기
-  const openCopyModal = async () => {
-    if (!selectedProduct) return
+  // 다른 품목 BOM 복사 모달 열기 (특정 품목을 지정하여 열 수도 있음)
+  const openCopyModal = async (targetProdId?: number) => {
+    const targetId = targetProdId || Number(selectedProduct)
+    if (!targetId) return
+    setSelectedProduct(targetId)
     setCopyModal(true)
     setSourceProductId('')
     setSourceBomPreview([])
-    setCopyMode(bomItems.length > 0 ? 'replace' : 'append')
+    const currentCount = bomCountMap[targetId] || 0
+    setCopyMode(currentCount > 0 ? 'replace' : 'append')
 
-    // 각 품목별 BOM 등록 개수 실시간 조회
+    // 각 품목별 BOM 등록 개수 최신화
     try {
       const { data: boms } = await supabase.from('bom').select('product_id')
       const countMap: Record<number, number> = {}
@@ -242,6 +266,17 @@ export default function BomPage() {
   const selectedProductObj = products.find(p => p.id === Number(selectedProduct))
   const displayBomItems = sortBomItems(bomItems)
 
+  // 미등록 품목 & 등록완료 품목 계산
+  const unregisteredProducts = products.filter(p => !bomCountMap[p.id])
+  const registeredProducts = products.filter(p => (bomCountMap[p.id] || 0) > 0)
+
+  // 필터에 따른 드롭다운 품목 목록
+  const dropdownProducts = products.filter(p => {
+    if (filterStatus === 'unregistered') return !bomCountMap[p.id]
+    if (filterStatus === 'registered') return (bomCountMap[p.id] || 0) > 0
+    return true
+  })
+
   // 복사 대상 품목 목록 (현재 선택된 품목 제외, BOM이 등록된 품목 우선 정렬)
   const sourceProductList = products
     .filter(p => p.id !== Number(selectedProduct))
@@ -264,38 +299,91 @@ export default function BomPage() {
         </div>
       </div>
       <div className="page-body">
-        {/* Product select & Action bar */}
+        {/* Product select & Status filter bar */}
         <div className="card" style={{ marginBottom: '16px' }}>
+          {/* Status filter tabs */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginRight: '4px' }}>
+              품목 분류:
+            </span>
+            <button
+              type="button"
+              className={`btn btn-sm ${filterStatus === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setFilterStatus('all')}
+            >
+              전체 품목 ({products.length})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${filterStatus === 'unregistered' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setFilterStatus('unregistered')}
+              style={
+                filterStatus === 'unregistered'
+                  ? { background: 'var(--yellow, #f59e0b)', color: '#000', borderColor: 'var(--yellow, #f59e0b)', fontWeight: 700 }
+                  : { color: 'var(--yellow, #f59e0b)', borderColor: 'rgba(245, 158, 11, 0.4)' }
+              }
+            >
+              ⚠️ BOM 미등록 ({unregisteredProducts.length})
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${filterStatus === 'registered' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setFilterStatus('registered')}
+              style={
+                filterStatus === 'registered'
+                  ? { background: 'var(--green, #10b981)', color: '#fff', borderColor: 'var(--green, #10b981)', fontWeight: 700 }
+                  : { color: 'var(--green, #10b981)', borderColor: 'rgba(16, 185, 129, 0.4)' }
+              }
+            >
+              ✅ 등록 완료 ({registeredProducts.length})
+            </button>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
-            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '280px', maxWidth: '520px' }}>
-              <label className="form-label">품목 선택</label>
+            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '280px', maxWidth: '560px' }}>
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>품목 선택</span>
+                {filterStatus === 'unregistered' && (
+                  <span style={{ color: 'var(--yellow)', fontSize: '12px', fontWeight: 600 }}>
+                    ⚠️ 미등록 품목만 표시 중 ({dropdownProducts.length}개)
+                  </span>
+                )}
+              </label>
               <select
                 className="form-control"
                 value={selectedProduct}
                 onChange={e => setSelectedProduct(e.target.value ? Number(e.target.value) : '')}
               >
-                <option value="">-- 품목을 선택하세요 --</option>
-                {products.map(p => (
-                  <option key={p.id} value={p.id}>{p.code} | {p.name}</option>
-                ))}
+                <option value="">-- 작업할 품목을 선택하세요 --</option>
+                {dropdownProducts.map(p => {
+                  const count = bomCountMap[p.id] || 0
+                  const isUnregistered = count === 0
+                  return (
+                    <option key={p.id} value={p.id}>
+                      {isUnregistered ? '⚠️ [미등록] ' : `✅ [자재 ${count}개] `}
+                      {p.code} | {p.name}
+                    </option>
+                  )
+                })}
               </select>
             </div>
 
-            {selectedProduct && (
+            {selectedProduct ? (
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={openCopyModal}
+                onClick={() => openCopyModal()}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                 title="다른 품목의 구성 자재 목록을 그대로 복사해옵니다."
               >
                 <span>📋</span> 다른 품목 BOM 복사해오기
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
-        {selectedProduct && (
+        {/* Selected Product BOM Editor */}
+        {selectedProduct ? (
           <>
             {/* Add material */}
             <div className="card" style={{ marginBottom: '16px' }}>
@@ -362,19 +450,19 @@ export default function BomPage() {
             </div>
 
             {/* BOM list */}
-            <div className="card" style={{ padding: 0 }}>
+            <div className="card" style={{ padding: 0, marginBottom: '24px' }}>
               {loading ? <div className="loading-spinner"><div className="spinner" /></div>
                 : displayBomItems.length === 0 ? (
                   <div className="empty-state">
                     <div className="empty-state-icon">🗂️</div>
-                    <h3>구성 자재가 없습니다</h3>
+                    <h3>구성 자재가 없습니다 (BOM 미등록)</h3>
                     <p style={{ marginBottom: '16px' }}>
                       위에서 자재를 직접 추가하거나, 비슷한 다른 품목의 BOM을 간편하게 불러오세요.
                     </p>
                     <button 
                       type="button" 
                       className="btn btn-primary"
-                      onClick={openCopyModal}
+                      onClick={() => openCopyModal()}
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                     >
                       <span>📋</span> 다른 품목 BOM 불러오기 (복사)
@@ -444,7 +532,7 @@ export default function BomPage() {
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        onClick={openCopyModal}
+                        onClick={() => openCopyModal()}
                         title="다른 품목 BOM으로 교체하거나 추가"
                       >
                         📋 다른 품목 BOM 덮어쓰기 / 추가
@@ -454,6 +542,79 @@ export default function BomPage() {
                 )}
             </div>
           </>
+        ) : null}
+
+        {/* 미등록 품목 모아보기 섹션 (품목 미선택 시 또는 '미등록' 필터 선택 시 노출) */}
+        {(!selectedProduct || filterStatus === 'unregistered') && (
+          <div className="card" style={{ padding: 0 }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <span className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>⚠️</span> BOM 미등록 완제품 목록 ({unregisteredProducts.length}개)
+              </span>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                아직 BOM(구성 자재)이 한 개도 등록되지 않은 품목들입니다
+              </span>
+            </div>
+
+            {unregisteredProducts.length === 0 ? (
+              <div className="empty-state" style={{ padding: '36px 20px' }}>
+                <div className="empty-state-icon">🎉</div>
+                <h3>모든 완제품에 BOM이 등록되어 있습니다!</h3>
+                <p>미등록된 품목이 없습니다. 언제든 위 드롭다운에서 기존 품목의 BOM을 수정할 수 있습니다.</p>
+              </div>
+            ) : (
+              <div className="table-container" style={{ border: 'none' }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th style={{ width: '60px' }}>순번</th>
+                      <th style={{ width: '120px' }}>품목코드</th>
+                      <th>품목명</th>
+                      <th style={{ width: '90px' }}>단위</th>
+                      <th>비고</th>
+                      <th style={{ width: '220px', textAlign: 'right' }}>빠른 작업</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unregisteredProducts.map((p, idx) => (
+                      <tr key={p.id}>
+                        <td className="td-muted">{idx + 1}</td>
+                        <td><span className="td-code">{p.code}</span></td>
+                        <td>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{p.name}</span>
+                        </td>
+                        <td className="td-muted">{p.unit}</td>
+                        <td className="td-muted" style={{ fontSize: '13px' }}>{p.note || '-'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => setSelectedProduct(p.id)}
+                              title="이 품목의 자재를 직접 등록합니다"
+                            >
+                              ➕ 자재 등록
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => openCopyModal(p.id)}
+                              title="다른 품목의 BOM을 그대로 복사해옵니다"
+                            >
+                              📋 다른 BOM 복사
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', color: 'var(--yellow)', fontSize: '12px', fontWeight: 500 }}>
+                  * 우측의 [➕ 자재 등록]을 누르면 직접 자재를 추가할 수 있고, [📋 다른 BOM 복사]를 누르면 유사한 다른 제품의 자재 목록을 1초 만에 그대로 가져옵니다.
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
